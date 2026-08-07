@@ -31,6 +31,9 @@ async def create_submission(payload: SubmissionCreate, db: AsyncIOMotorDatabase 
         "name": payload.name,
         "whatsapp": payload.whatsapp,
         "email": payload.email,
+        "address": payload.address,
+        "user_email": (payload.email or "").lower().strip() or None,
+        "status": "new",
         "items": items,
         "created_at": now_utc(),
     }

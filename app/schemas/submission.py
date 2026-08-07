@@ -11,15 +11,17 @@ class SubmissionItem(BaseModel):
     pada_code: Optional[str] = None
     direction16: Optional[str] = None
     verdict: Optional[str] = None
+    images: List[str] = Field(default_factory=list)  # Cloudinary URLs of the user's photos
 
 
 class SubmissionCreate(BaseModel):
     device_id: Optional[str] = None
     title: Optional[str] = "My Property"
-    # Contact details captured at submit time.
+    # Contact (from the logged-in user's profile) + property location.
     name: Optional[str] = None
     whatsapp: Optional[str] = None
     email: Optional[str] = None
+    address: Optional[str] = None
     items: List[SubmissionItem] = Field(default_factory=list)
 
 
@@ -30,6 +32,9 @@ class SubmissionResponse(BaseModel):
     name: Optional[str] = None
     whatsapp: Optional[str] = None
     email: Optional[str] = None
+    address: Optional[str] = None
+    user_email: Optional[str] = None
+    status: Optional[str] = "new"
     items: List[SubmissionItem]
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
