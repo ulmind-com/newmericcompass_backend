@@ -4,19 +4,26 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.api.router import api_router
 from app.core.logger import setup_logging
+from app.db.seed import ensure_seed_data
 from app.services.cloudinary_service import configure_cloudinary
 
 # Configure professional logging
 setup_logging()
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup actions
     await connect_to_mongo()
     configure_cloudinary()
+    try:
+        await ensure_seed_data(get_database())
+    except Exception as exc:  # never let seeding block startup
+        logger.error("Auto-seed failed: %s", exc)
     yield
     # Shutdown actions
     await close_mongo_connection()
