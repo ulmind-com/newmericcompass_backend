@@ -8,6 +8,7 @@ dependencies = [
     "aioboto3>=15.5.0",
     "bcrypt>=5.0.0",
     "cloudinary>=1.45.0",
+    "email-validator>=2.3.0",
     "fastapi>=0.141.1",
     "filetype>=1.2.0",
     "motor>=3.7.1",
