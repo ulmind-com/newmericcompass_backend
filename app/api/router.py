@@ -10,6 +10,7 @@ from app.api.routes import (
     auth,
     public,
     submissions,
+    users,
     vastu,
 )
 
@@ -21,7 +22,8 @@ api_router.include_router(vastu.router, prefix="/vastu", tags=["Vastu Engine"])
 api_router.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
 
 # ---- Auth ----
-api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
+api_router.include_router(auth.router, prefix="/auth", tags=["Admin Auth"])
+api_router.include_router(users.router, prefix="/users", tags=["App Users"])
 
 # ---- Admin ----
 api_router.include_router(admin_dashboard.router, prefix="/admin", tags=["Admin Dashboard"])
