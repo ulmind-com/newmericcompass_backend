@@ -1,9 +1,13 @@
-# Render.com blueprint. Import this repo as a Blueprint and set the secret env vars.
+# Render.com blueprint (native Python + uv runtime).
+# Import this repo as a Blueprint, then fill in the secret env vars.
 services:
   - type: web
     name: newmericcompass-backend
-    runtime: docker
+    runtime: python
     plan: free
+    buildCommand: "uv sync --frozen --no-dev"
+    # Binds to 0.0.0.0:$PORT so Render can detect the open port.
+    startCommand: "uv run python main.py"
     healthCheckPath: /ping
     autoDeploy: true
     envVars:
