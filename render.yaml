@@ -1,0 +1,21 @@
+# Render.com blueprint. Import this repo as a Blueprint and set the secret env vars.
+services:
+  - type: web
+    name: newmericcompass-backend
+    runtime: docker
+    plan: free
+    healthCheckPath: /ping
+    autoDeploy: true
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+      - key: DATABASE_NAME
+        value: newmericcompass
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
