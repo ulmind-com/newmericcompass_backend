@@ -51,6 +51,29 @@ ZONE_ATTRS = {
     "NNW": {"life_aspect": "Sex & Attraction",        "organ": "Bladder",      "element": "Water", "dosha": "Kapha"},
 }
 
+# Pastel element/zone colour per 16-wind zone (matches the Newmeric Compass chart).
+ZONE_COLOR = {
+    "N": "#CFE8F5", "NNE": "#CFE8F5", "NE": "#CFE9C6", "ENE": "#C9E7B0",
+    "E": "#C4E4A6", "ESE": "#D8E9A6", "SE": "#F4C8D6", "SSE": "#F2BCCB",
+    "S": "#F3C2CB", "SSW": "#F3E6A6", "SW": "#EFE296", "WSW": "#ECE6AE",
+    "W": "#DDCFEC", "WNW": "#D9C8E9", "NW": "#ECE0C6", "NNW": "#D0E6EC",
+}
+
+# The 27 nakshatras (lunar mansions). Each pada is assigned the nakshatra that
+# governs its arc; the offset aligns Rohini/Pushya near North as on the chart.
+NAKSHATRA_27 = [
+    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu",
+    "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta",
+    "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha",
+    "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada",
+    "Uttara Bhadrapada", "Revati",
+]
+
+
+def _nakshatra_for(center_deg: float) -> str:
+    return NAKSHATRA_27[(int(center_deg // (360 / 27)) + 7) % 27]
+
+
 # 32 boundary devatas / nakshatra-style names of the Vastu Purusha Mandala,
 # best-effort clockwise order starting at N5 (due North). Admin-editable.
 PADA_NAMES = [
@@ -105,7 +128,8 @@ def build_padas() -> list[dict]:
             "dosha": attrs["dosha"],
             "organ": attrs["organ"],
             "life_aspect": attrs["life_aspect"],
-            "nakshatra": None,
+            "nakshatra": _nakshatra_for(center),
+            "color": ZONE_COLOR[d16],
             "default_verdict": "average",
             "description": None,
             "is_active": True,
