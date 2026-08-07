@@ -5,9 +5,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "aioboto3>=15.5.0",
+    "bcrypt>=5.0.0",
+    "cloudinary>=1.45.0",
     "fastapi>=0.141.1",
+    "filetype>=1.2.0",
     "motor>=3.7.1",
+    "passlib>=1.7.4",
     "pydantic-settings>=2.14.2",
+    "pyjwt>=2.13.0",
     "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.32",
     "uvicorn>=0.52.1",
 ]

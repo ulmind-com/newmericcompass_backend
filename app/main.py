@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.api.router import api_router
 from app.core.logger import setup_logging
+from app.services.cloudinary_service import configure_cloudinary
 
 # Configure professional logging
 setup_logging()
@@ -15,6 +16,7 @@ setup_logging()
 async def lifespan(app: FastAPI):
     # Startup actions
     await connect_to_mongo()
+    configure_cloudinary()
     yield
     # Shutdown actions
     await close_mongo_connection()

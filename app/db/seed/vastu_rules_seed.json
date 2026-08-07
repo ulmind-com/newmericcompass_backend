@@ -1,0 +1,66 @@
+[
+  {
+    "room_type": "Kitchen",
+    "direction": "North-East",
+    "score": 15,
+    "status": "Major Dosh",
+    "remedy": {
+      "title": "Neutralize the Fire-Water Conflict",
+      "description": "NE is the water/spiritual zone, so a fire-element room here is a serious dosh. Relocate the kitchen if the floor plan allows. If not, place a copper Vastu pyramid in the NE corner, avoid red/orange décor, and keep the space free of clutter.",
+      "remedy_type": "Structural"
+    },
+    "notes": "Considered one of the most damaging kitchen placements in classical Vastu."
+  },
+  {
+    "room_type": "Master Bedroom",
+    "direction": "North-East",
+    "score": 15,
+    "status": "Major Dosh",
+    "remedy": {
+      "title": "Restore the Spiritual Zone",
+      "description": "NE should remain open and lightly used; sleeping here disrupts clarity and health. If relocation isn't possible, sleep with the head towards the South, use minimal/light furniture, and keep the NE corner uncluttered.",
+      "remedy_type": "Behavioral"
+    },
+    "notes": null
+  },
+  {
+    "room_type": "Puja Room",
+    "direction": "North-East",
+    "score": 100,
+    "status": "Excellent",
+    "remedy": null,
+    "notes": "Ishanya corner - the traditional and most auspicious placement for a Puja room."
+  },
+  {
+    "room_type": "Kitchen",
+    "direction": "South-East",
+    "score": 95,
+    "status": "Excellent",
+    "remedy": null,
+    "notes": "Agni corner - the ideal placement for the kitchen and the cooking stove."
+  },
+  {
+    "room_type": "Master Bedroom",
+    "direction": "South-East",
+    "score": 25,
+    "status": "Major Dosh",
+    "remedy": {
+      "title": "Cool the Fire-Air Conflict",
+      "description": "SE combines fire and air energy, which can cause irritability and conflict for occupants. Use cool blues/greens instead of red, avoid mirrors facing the bed, and place a heavy Earth-element object (e.g. a stone showpiece) in the SW corner of the room.",
+      "remedy_type": "Color"
+    },
+    "notes": null
+  },
+  {
+    "room_type": "Puja Room",
+    "direction": "South-East",
+    "score": 40,
+    "status": "Average",
+    "remedy": {
+      "title": "Shield From Kitchen Fire Energy",
+      "description": "Keep the puja unit against the room's East or North wall, away from direct exposure to the SE corner's fire energy, and avoid sharing a wall with the kitchen stove where possible.",
+      "remedy_type": "Object Placement"
+    },
+    "notes": null
+  }
+]

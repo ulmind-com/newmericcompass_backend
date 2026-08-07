@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     MONGODB_URL: str
     DATABASE_NAME: str = "newmericcompass"
     
+    # Cloudinary settings
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
+    
     # Optional settings that might be useful later
     SECRET_KEY: Optional[str] = None
     ALGORITHM: str = "HS256"
