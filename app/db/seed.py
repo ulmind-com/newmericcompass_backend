@@ -8,6 +8,7 @@ insert so admin edits survive re-runs.
 
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -217,6 +218,58 @@ async def _seed_categories_and_rules(db: AsyncIOMotorDatabase) -> None:
     logger.info("Seeded %d categories and %d rules.", len(PROFILES), rule_count)
 
 
+async def _seed_demo(db: AsyncIOMotorDatabase) -> None:
+    """Insert demo users / submissions / tips so every admin page has data.
+    Each collection is only touched when empty, so real sign-ups are never lost."""
+    now = datetime.now(timezone.utc)
+
+    if await db.users.count_documents({}) == 0:
+        pw = get_password_hash("demo1234")
+        demo = [
+            ("Aarav Sharma", "aarav@example.com", "+91 98000 00001", True, "active", 2),
+            ("Diya Patel", "diya@example.com", "+91 98000 00002", False, "active", 6),
+            ("Vihaan Gupta", "vihaan@example.com", "+91 98000 00003", True, "active", 9),
+            ("Ananya Singh", "ananya@example.com", "+91 98000 00004", False, "active", 13),
+            ("Kabir Mehta", "kabir@example.com", "+91 98000 00005", False, "blocked", 20),
+            ("Isha Reddy", "isha@example.com", "+91 98000 00006", True, "active", 27),
+            ("Rohan Nair", "rohan@example.com", "+91 98000 00007", False, "active", 34),
+            ("Sara Khan", "sara@example.com", "+91 98000 00008", False, "active", 41),
+        ]
+        await db.users.insert_many([
+            {"name": n, "email": e, "whatsapp": w, "phone": None, "hashed_password": pw,
+             "is_premium": prem, "status": st, "role": "user", "created_at": now - timedelta(days=days)}
+            for n, e, w, prem, st, days in demo
+        ])
+
+    if await db.submissions.count_documents({}) == 0:
+        await db.submissions.insert_many([
+            {"device_id": None, "title": "3BHK Flat — Kolkata", "name": "Aarav Sharma",
+             "whatsapp": "+91 98000 00001", "email": "aarav@example.com",
+             "items": [{"category_slug": "main-entrance", "category_name": "Main Entrance", "degree": 46.0, "pada_code": "E1", "direction16": "NE", "verdict": "excellent"},
+                       {"category_slug": "kitchen", "category_name": "Kitchen", "degree": 135.0, "pada_code": "S1", "direction16": "SE", "verdict": "excellent"},
+                       {"category_slug": "toilet", "category_name": "Toilet", "degree": 4.0, "pada_code": "N5", "direction16": "N", "verdict": "bad"}],
+             "created_at": now - timedelta(days=1)},
+            {"device_id": None, "title": "Villa — Pune", "name": "Isha Reddy",
+             "whatsapp": "+91 98000 00006", "email": "isha@example.com",
+             "items": [{"category_slug": "temple", "category_name": "Temple", "degree": 45.0, "pada_code": "E1", "direction16": "NE", "verdict": "excellent"},
+                       {"category_slug": "bedroom", "category_name": "Bedroom", "degree": 225.0, "pada_code": "W1", "direction16": "SW", "verdict": "excellent"}],
+             "created_at": now - timedelta(days=3)},
+            {"device_id": None, "title": "Office — Mumbai", "name": "Vihaan Gupta",
+             "whatsapp": "+91 98000 00003", "email": "vihaan@example.com",
+             "items": [{"category_slug": "safe-locker", "category_name": "Safe / Locker", "degree": 225.0, "pada_code": "W1", "direction16": "SW", "verdict": "excellent"}],
+             "created_at": now - timedelta(days=5)},
+        ])
+
+    if await db.tips.count_documents({}) == 0:
+        await db.tips.insert_many([
+            {"title": "Keep the North-East light", "body": "The NE (Ishanya) should stay open, clean and clutter-free to invite positive energy and clarity.", "category_slug": None, "image_url": None, "order": 0, "is_active": True},
+            {"title": "Cook facing East", "body": "Place the stove in the South-East so the cook faces East — it supports health and prosperity.", "category_slug": "kitchen", "image_url": None, "order": 1, "is_active": True},
+            {"title": "Sleep head to the South", "body": "In the master bedroom (South-West), sleep with your head towards the South for restful, stable sleep.", "category_slug": "bedroom", "image_url": None, "order": 2, "is_active": True},
+            {"title": "Toilet doors shut", "body": "Always keep toilet doors closed and add a sea-salt bowl to neutralise negative energy.", "category_slug": "toilet", "image_url": None, "order": 3, "is_active": True},
+        ])
+    logger.info("Demo data ensured (users/submissions/tips).")
+
+
 async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
     email = os.getenv("ADMIN_EMAIL")
     password = os.getenv("ADMIN_PASSWORD")
@@ -231,7 +284,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 3
+SEED_VERSION = 4
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
@@ -243,6 +296,7 @@ async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> Non
     if force or current < SEED_VERSION:
         await _seed_padas(db)
         await _seed_categories_and_rules(db)
+        await _seed_demo(db)
         await db.meta.update_one({"_id": "seed"}, {"$set": {"version": SEED_VERSION}}, upsert=True)
         logger.info("Seed complete (version %d).", SEED_VERSION)
     else:
