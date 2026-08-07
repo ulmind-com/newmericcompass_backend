@@ -1,14 +1,36 @@
 from fastapi import APIRouter
 
-from app.api.routes import vastu
-from app.api.routes import admin_rules
-from app.api.routes import admin_dashboard
+from app.api.routes import (
+    admin_categories,
+    admin_dashboard,
+    admin_padas,
+    admin_rules,
+    admin_tips,
+    admin_uploads,
+    auth,
+    public,
+    submissions,
+    vastu,
+)
 
 api_router = APIRouter()
 
+# ---- Public (app-facing) ----
+api_router.include_router(public.router, tags=["Public"])
 api_router.include_router(vastu.router, prefix="/vastu", tags=["Vastu Engine"])
-api_router.include_router(admin_rules.router, prefix="/admin/rules", tags=["Admin Rules"])
+api_router.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
+
+# ---- Auth ----
+api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
+
+# ---- Admin ----
 api_router.include_router(admin_dashboard.router, prefix="/admin", tags=["Admin Dashboard"])
+api_router.include_router(admin_categories.router, prefix="/admin/categories", tags=["Admin Categories"])
+api_router.include_router(admin_padas.router, prefix="/admin/padas", tags=["Admin Padas"])
+api_router.include_router(admin_rules.router, prefix="/admin/rules", tags=["Admin Rules"])
+api_router.include_router(admin_tips.router, prefix="/admin/tips", tags=["Admin Tips"])
+api_router.include_router(admin_uploads.router, prefix="/admin/uploads", tags=["Admin Uploads"])
+
 
 @api_router.get("/health")
 async def health_check():

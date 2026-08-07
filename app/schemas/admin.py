@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
@@ -11,8 +11,14 @@ class TokenData(BaseModel):
     role: Optional[str] = None
 
 class AdminLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
+
+class AdminProfile(BaseModel):
+    email: str
+    name: Optional[str] = None
+    role: str = "admin"
+
 
 class DashboardStats(BaseModel):
     total_users: int
