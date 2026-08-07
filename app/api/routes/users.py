@@ -9,7 +9,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.config import settings
 from app.core.database import get_database
 from app.core.security import TokenData, create_access_token, get_current_user, get_password_hash, verify_password
-from app.schemas.common import now_utc, serialize_doc
+from app.schemas.common import now_utc, serialize_doc, serialize_docs
+from app.schemas.submission import SubmissionResponse
 from app.schemas.user import AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate
 
 router = APIRouter()
@@ -67,6 +68,16 @@ async def me(current: TokenData = Depends(get_current_user), db: AsyncIOMotorDat
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return _profile(user)
+
+
+@router.get("/me/submissions", response_model=list[SubmissionResponse])
+async def my_submissions(
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """The logged-in user's own property-scan history."""
+    cursor = db.submissions.find({"user_email": (current.email or "").lower()}).sort("created_at", -1)
+    return serialize_docs(await cursor.to_list(length=200))
 
 
 @router.patch("/me", response_model=UserProfile)
