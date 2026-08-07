@@ -28,6 +28,7 @@ class PadaBase(BaseModel):
     organ: Optional[str] = None
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
+    color: Optional[str] = None
     default_verdict: Verdict = Verdict.AVERAGE
     description: Optional[str] = None
     is_active: bool = True
@@ -47,6 +48,7 @@ class PadaUpdate(BaseModel):
     organ: Optional[str] = None
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
+    color: Optional[str] = None
     default_verdict: Optional[Verdict] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None

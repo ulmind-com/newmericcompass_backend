@@ -186,11 +186,11 @@ _STRUCTURAL = {"index", "quadrant", "quadrant_index", "center_deg", "start_deg",
 
 
 async def _seed_padas(db: AsyncIOMotorDatabase) -> None:
+    # Full refresh of the pada master (runs only on first seed or SEED_VERSION bump).
     for pada in all_padas():
         code = pada["code"]
-        set_fields = {k: v for k, v in pada.items() if k in _STRUCTURAL}
-        insert_fields = {k: v for k, v in pada.items() if k not in _STRUCTURAL and k != "code"}
-        await db.padas.update_one({"code": code}, {"$set": set_fields, "$setOnInsert": insert_fields}, upsert=True)
+        fields = {k: v for k, v in pada.items() if k != "code"}
+        await db.padas.update_one({"code": code}, {"$set": fields}, upsert=True)
 
 
 async def _seed_categories_and_rules(db: AsyncIOMotorDatabase) -> None:
@@ -231,7 +231,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 2
+SEED_VERSION = 3
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
