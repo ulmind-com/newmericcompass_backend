@@ -5,11 +5,13 @@ from app.api.routes import (
     admin_dashboard,
     admin_padas,
     admin_rules,
+    admin_submissions,
     admin_tips,
     admin_uploads,
     auth,
     public,
     submissions,
+    uploads,
     users,
     vastu,
 )
@@ -20,6 +22,7 @@ api_router = APIRouter()
 api_router.include_router(public.router, tags=["Public"])
 api_router.include_router(vastu.router, prefix="/vastu", tags=["Vastu Engine"])
 api_router.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
+api_router.include_router(uploads.router, prefix="/uploads", tags=["Uploads"])
 
 # ---- Auth ----
 api_router.include_router(auth.router, prefix="/auth", tags=["Admin Auth"])
@@ -30,6 +33,7 @@ api_router.include_router(admin_dashboard.router, prefix="/admin", tags=["Admin 
 api_router.include_router(admin_categories.router, prefix="/admin/categories", tags=["Admin Categories"])
 api_router.include_router(admin_padas.router, prefix="/admin/padas", tags=["Admin Padas"])
 api_router.include_router(admin_rules.router, prefix="/admin/rules", tags=["Admin Rules"])
+api_router.include_router(admin_submissions.router, prefix="/admin/submissions", tags=["Admin Submissions"])
 api_router.include_router(admin_tips.router, prefix="/admin/tips", tags=["Admin Tips"])
 api_router.include_router(admin_uploads.router, prefix="/admin/uploads", tags=["Admin Uploads"])
 
