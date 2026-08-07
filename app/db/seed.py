@@ -1,8 +1,9 @@
-"""Idempotent database seeding for padas, categories, sample rules and admin.
+"""Idempotent database seeding: padas, categories (with best/avoid directions),
+a full set of category x direction rules, and an admin from env.
 
-Used both by the startup auto-seed (see app.main lifespan) and the standalone
-`scripts/seed_all.py`. Safe to run repeatedly: structural pada fields are always
-refreshed, while editable content is only set on insert so admin edits survive.
+Used by the startup auto-seed (app.main lifespan) and scripts/seed_all.py.
+Structural pada fields are always refreshed; editable content is only set on
+insert so admin edits survive re-runs.
 """
 
 import logging
@@ -11,11 +12,11 @@ import os
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.security import get_password_hash
-from app.domain.padas import all_padas
+from app.domain.padas import DIRECTION_16, DIRECTION_16_FULL, all_padas
 
 logger = logging.getLogger(__name__)
 
-# icon_key maps to a bundled icon in the mobile app.
+# --- Categories: (slug, name, icon_key) ---
 CATEGORIES = [
     ("main-entrance", "Main Entrance", "door"),
     ("bedroom", "Bedroom", "bed"),
@@ -39,58 +40,135 @@ CATEGORIES = [
     ("safe-locker", "Safe / Locker", "safe"),
 ]
 
-# (category_slug, pada_code, verdict, score, [effects], [treatments])
-SAMPLE_RULES = [
-    ("main-entrance", "N5", "good", 78,
-     ["An entrance in the North attracts new money opportunities and career growth.",
-      "Occupants tend to value relationships and financial stability."],
-     ["Keep this entrance clutter-free and well-lit.",
-      "Use shades of blue or green near the doorway."]),
-    ("main-entrance", "E5", "excellent", 92,
-     ["An East entrance brings social recognition and strong connections.",
-      "Supports clarity of thought and good health for the family."],
-     ["Maintain an open, bright approach to the door.",
-      "Avoid heavy storage around this entrance."]),
-    ("main-entrance", "S1", "bad", 28,
-     ["A South-East main door can raise conflict and impulsive spending.",
-      "Excess fire energy may cause irritability among occupants."],
-     ["Place a brass Vastu pyramid above the door frame.",
-      "Avoid red tones; introduce cooling greens."]),
-    ("toilet", "N5", "bad", 24,
-     ["A toilet in the North drains money and career opportunities.",
-      "Can create obstacles in cash flow and professional growth."],
-     ["Keep the toilet door closed at all times.",
-      "Place a sea-salt bowl inside and replace it weekly.",
-      "Use light grey / white tiles, avoid dark colours."]),
-    ("toilet", "W5", "good", 72,
-     ["A toilet in the West is largely neutral and supports gains.",
-      "Minimal negative impact when kept clean and dry."],
-     ["Ensure good ventilation and keep the space dry."]),
-    ("kitchen", "S1", "excellent", 95,
-     ["The South-East (Agni) corner is the ideal placement for the kitchen.",
-      "Supports health, digestion and financial energy."],
-     ["Position the cooking stove so the cook faces East."]),
-    ("kitchen", "N5", "bad", 20,
-     ["A kitchen in the North weakens money-attraction energy.",
-      "The fire element conflicts with the water zone of the North."],
-     ["Relocate if possible; otherwise add earth-element decor.",
-      "Avoid a blue colour scheme in a North kitchen."]),
-    ("temple", "N8", "excellent", 98,
-     ["The North-East (Ishanya) is the most auspicious spot for a temple.",
-      "Enhances clarity, devotion and positive energy in the home."],
-     ["Keep idols facing West so worshippers face East.",
-      "Keep the zone spotless and free of storage."]),
-    ("bedroom", "W1", "excellent", 90,
-     ["The South-West master bedroom grants stability and strong relationships.",
-      "Promotes restful sleep and authority for the head of the family."],
-     ["Sleep with the head towards the South.",
-      "Use heavy, earthy furniture in this room."]),
-    ("bedroom", "N8", "bad", 26,
-     ["A bedroom in the North-East disturbs mental clarity and sleep.",
-      "This spiritual zone is better left open and lightly used."],
-     ["Keep the North-East corner uncluttered and airy.",
-      "Prefer light furnishings; sleep head towards South."]),
-]
+# Nearest 8-wind parent for each 16-wind direction.
+MAP16TO8 = {
+    "N": "N", "NNE": "NE", "NE": "NE", "ENE": "E", "E": "E", "ESE": "SE",
+    "SE": "SE", "SSE": "S", "S": "S", "SSW": "SW", "SW": "SW", "WSW": "W",
+    "W": "W", "WNW": "NW", "NW": "NW", "NNW": "N",
+}
+# Representative pada (its 16-wind zone centre) for each direction.
+REP = {
+    "N": "N5", "NNE": "N7", "NE": "E1", "ENE": "E3", "E": "E5", "ESE": "E7",
+    "SE": "S1", "SSE": "S3", "S": "S5", "SSW": "S7", "SW": "W1", "WSW": "W3",
+    "W": "W5", "WNW": "W7", "NW": "N1", "NNW": "N3",
+}
+
+# Per-category Vastu profile (8-wind sets) + flavour text.
+# best -> excellent, good -> good, bad -> bad, everything else -> average.
+PROFILES = {
+    "main-entrance": (["N", "E", "NE"], ["NW", "W"], ["SW", "S"],
+                      "money, opportunities and career growth",
+                      "Place a brass Vastu pyramid or a Swastik above the door and keep the entry brightly lit."),
+    "bedroom": (["SW"], ["S", "W"], ["NE", "SE"],
+                "stability, sound sleep and strong relationships",
+                "Sleep with the head to the South; add a heavy earth-element item in the SW."),
+    "kitchen": (["SE"], ["NW", "S"], ["NE", "N", "SW"],
+                "health, digestion and financial energy",
+                "Position the stove so the cook faces East; avoid a blue colour scheme."),
+    "toilet": (["NW"], ["W"], ["NE", "N", "E", "SW", "SE"],
+               "money flow and health",
+               "Keep the door shut, place a sea-salt bowl inside, and use light grey/white tiles."),
+    "washing-area": (["NW", "W"], ["SE"], ["NE", "SW"],
+                     "smooth daily routines and hygiene",
+                     "Keep drainage flowing towards the North-East and the area dry."),
+    "dustbin": (["S", "SW", "W"], ["NW"], ["NE", "N", "E"],
+                "disposal of negativity and waste",
+                "Use a covered bin and empty it daily; never keep waste in the NE."),
+    "temple": (["NE"], ["N", "E"], ["S", "SW", "W"],
+               "clarity, devotion and positive energy",
+               "Keep idols facing West (worshipper faces East) and the zone spotless."),
+    "study-room": (["NE", "E", "N"], ["W"], ["SE", "S", "SW"],
+                   "concentration, memory and academic success",
+                   "Sit facing East or North while studying; keep the desk clutter-free."),
+    "guest-room": (["NW"], ["W", "S"], ["NE", "SE"],
+                   "hospitality and short, pleasant stays",
+                   "Use light furnishings and keep the NE corner of the room open."),
+    "drawing-room": (["N", "E", "NE"], ["NW"], ["SW", "SE"],
+                     "social connections and reputation",
+                     "Seat the head of the family facing East/North; keep the centre open."),
+    "dining-hall": (["W"], ["E", "S"], ["NE", "SW"],
+                    "health, bonding and good appetite",
+                    "Face East or West while eating; avoid a toilet adjacent to it."),
+    "living-room": (["N", "E", "NE"], ["NW", "W"], ["SW"],
+                    "harmony, guests and positive vibes",
+                    "Keep heavy furniture in the South/West and the NE light and open."),
+    "kids-room": (["W", "NW"], ["N", "E"], ["SW", "S"],
+                  "growth, focus and good sleep for children",
+                  "Let children sleep with the head to the East/South; study facing East."),
+    "store-room": (["SW", "S", "W"], ["NW"], ["NE", "E"],
+                   "stability and orderly storage",
+                   "Store heavy goods in the SW; never store in the NE."),
+    "staircase": (["SW", "S", "W"], ["NW", "SE"], ["NE", "N", "E"],
+                  "steady progress without draining energy",
+                  "Build stairs clockwise in the South/West; keep the NE free of stairs."),
+    "inverter": (["SE"], ["S", "NW"], ["NE", "N"],
+                 "reliable power and fire-element balance",
+                 "Place electrical/fire equipment in the SE; keep it off the NE."),
+    "heater": (["SE"], ["S"], ["NE", "N", "NW"],
+               "warmth and fire-element balance",
+               "Keep heating appliances in the SE (Agni) corner."),
+    "ac": (["W", "NW"], ["N", "E"], ["SE"],
+           "comfort and cool air flow",
+           "Mount the AC on the West/North wall; avoid the fiery SE."),
+    "water-tank": (["NE"], ["N", "E"], ["SW", "S", "SE"],
+                   "wealth and health from the water element",
+                   "Keep underground water in the NE; overhead tanks in the SW/W."),
+    "safe-locker": (["SW", "S"], ["N"], ["NE", "E"],
+                    "wealth accumulation and savings",
+                    "Place the locker in the SW so it opens towards the North."),
+}
+
+_SCORE = {"excellent": 92, "good": 76, "average": 50, "bad": 24}
+
+
+def _rule_content(name: str, dir16: str, verdict: str, benefit: str, remedy: str):
+    full = DIRECTION_16_FULL[dir16]
+    if verdict == "excellent":
+        return ([f"The {full} is an ideal, auspicious location for the {name} — one of the best placements in Vastu.",
+                 f"Strongly enhances {benefit}."],
+                ["Keep this zone clean, well-lit and clutter-free to preserve the positive energy."])
+    if verdict == "good":
+        return ([f"The {name} in the {full} is favourable and works well with a little care.",
+                 f"Gently supports {benefit}."],
+                ["Maintain the area tidy and well-ventilated."])
+    if verdict == "bad":
+        return ([f"A {name} in the {full} creates a Vastu dosh and can cause obstacles.",
+                 f"May weaken {benefit} and household harmony."],
+                [remedy, "Keep the area closed/covered when not in use and free of clutter."])
+    return ([f"A {name} in the {full} is broadly neutral — neither strongly beneficial nor harmful.",
+             "Its effect depends on the overall layout."],
+            ["No major remedy needed; simply keep the space clean and organised."])
+
+
+def _verdict_for(dir16: str, best, good, bad) -> str:
+    p = MAP16TO8[dir16]
+    if p in best:
+        return "excellent"
+    if p in good:
+        return "good"
+    if p in bad:
+        return "bad"
+    return "average"
+
+
+def build_category_rules():
+    """Yield (slug, name, best_dirs, avoid_dirs, [rule_dicts]) for every category."""
+    name_by_slug = {slug: name for slug, name, _ in CATEGORIES}
+    for slug, (best, good, bad, benefit, remedy) in PROFILES.items():
+        name = name_by_slug.get(slug, slug.title())
+        best_dirs = [d for d in DIRECTION_16 if MAP16TO8[d] in best]
+        avoid_dirs = [d for d in DIRECTION_16 if MAP16TO8[d] in bad]
+        rules = []
+        for dir16 in DIRECTION_16:
+            verdict = _verdict_for(dir16, best, good, bad)
+            effects, treatments = _rule_content(name, dir16, verdict, benefit, remedy)
+            rules.append({
+                "category_slug": slug, "pada_code": REP[dir16], "verdict": verdict,
+                "score": _SCORE[verdict], "effects": effects,
+                "treatments": treatments,
+                "is_active": True, "notes": None,
+            })
+        yield slug, name, best_dirs, avoid_dirs, rules
 
 
 async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
@@ -100,6 +178,7 @@ async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
     await db.vastu_rules.create_index([("category_slug", 1), ("pada_code", 1)], unique=True)
     await db.submissions.create_index("created_at")
     await db.admins.create_index("email", unique=True)
+    await db.users.create_index("email", unique=True)
 
 
 _STRUCTURAL = {"index", "quadrant", "quadrant_index", "center_deg", "start_deg",
@@ -111,62 +190,62 @@ async def _seed_padas(db: AsyncIOMotorDatabase) -> None:
         code = pada["code"]
         set_fields = {k: v for k, v in pada.items() if k in _STRUCTURAL}
         insert_fields = {k: v for k, v in pada.items() if k not in _STRUCTURAL and k != "code"}
-        await db.padas.update_one(
-            {"code": code}, {"$set": set_fields, "$setOnInsert": insert_fields}, upsert=True
-        )
+        await db.padas.update_one({"code": code}, {"$set": set_fields, "$setOnInsert": insert_fields}, upsert=True)
 
 
-async def _seed_categories(db: AsyncIOMotorDatabase) -> None:
-    for order, (slug, name, icon_key) in enumerate(CATEGORIES):
+async def _seed_categories_and_rules(db: AsyncIOMotorDatabase) -> None:
+    order = 0
+    icon_by_slug = {slug: icon for slug, _, icon in CATEGORIES}
+    rule_count = 0
+    for slug, name, best_dirs, avoid_dirs, rules in build_category_rules():
         await db.categories.update_one(
             {"slug": slug},
-            {"$set": {"name": name, "icon_key": icon_key, "order": order, "is_active": True},
+            {"$set": {"name": name, "icon_key": icon_by_slug.get(slug), "order": order,
+                      "is_active": True, "best_directions": best_dirs, "avoid_directions": avoid_dirs},
              "$setOnInsert": {"slug": slug, "icon_url": None}},
             upsert=True,
         )
-
-
-async def _seed_rules(db: AsyncIOMotorDatabase) -> None:
-    for slug, pada, verdict, score, effects, treatments in SAMPLE_RULES:
-        await db.vastu_rules.update_one(
-            {"category_slug": slug, "pada_code": pada},
-            {"$set": {"verdict": verdict, "score": score, "effects": effects,
-                      "treatments": treatments, "is_active": True},
-             "$setOnInsert": {"category_slug": slug, "pada_code": pada, "notes": None}},
-            upsert=True,
-        )
+        order += 1
+        for r in rules:
+            await db.vastu_rules.update_one(
+                {"category_slug": r["category_slug"], "pada_code": r["pada_code"]},
+                {"$set": {k: r[k] for k in ("verdict", "score", "effects", "treatments", "is_active")},
+                 "$setOnInsert": {"category_slug": r["category_slug"], "pada_code": r["pada_code"], "notes": None}},
+                upsert=True,
+            )
+            rule_count += 1
+    logger.info("Seeded %d categories and %d rules.", len(PROFILES), rule_count)
 
 
 async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
     email = os.getenv("ADMIN_EMAIL")
     password = os.getenv("ADMIN_PASSWORD")
-    if not email or not password:
-        return
-    if await db.admins.find_one({"email": email.lower()}):
+    if not email or not password or await db.admins.find_one({"email": email.lower()}):
         return
     await db.admins.insert_one({
-        "email": email.lower(),
-        "name": os.getenv("ADMIN_NAME", "Administrator"),
-        "hashed_password": get_password_hash(password),
-        "role": "admin",
-        "is_active": True,
+        "email": email.lower(), "name": os.getenv("ADMIN_NAME", "Administrator"),
+        "hashed_password": get_password_hash(password), "role": "admin", "is_active": True,
     })
     logger.info("Auto-created admin %s", email.lower())
 
 
-async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
-    """Seed if empty (or force). Idempotent; preserves admin edits."""
-    await ensure_indexes(db)
-    pada_count = await db.padas.count_documents({})
-    cat_count = await db.categories.count_documents({})
+# Bump this whenever the seed content changes so already-populated deployments
+# pick up the new data automatically on their next startup.
+SEED_VERSION = 2
 
-    if force or pada_count < 32 or cat_count == 0:
+
+async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
+    """Seed on first run or when SEED_VERSION advances (or force). Idempotent."""
+    await ensure_indexes(db)
+    meta = await db.meta.find_one({"_id": "seed"})
+    current = (meta or {}).get("version", 0)
+
+    if force or current < SEED_VERSION:
         await _seed_padas(db)
-        await _seed_categories(db)
-        await _seed_rules(db)
-        logger.info("Seed complete: 32 padas, %d categories, %d sample rules.",
-                    len(CATEGORIES), len(SAMPLE_RULES))
+        await _seed_categories_and_rules(db)
+        await db.meta.update_one({"_id": "seed"}, {"$set": {"version": SEED_VERSION}}, upsert=True)
+        logger.info("Seed complete (version %d).", SEED_VERSION)
     else:
-        logger.info("Seed skipped (already populated: %d padas, %d categories).", pada_count, cat_count)
+        logger.info("Seed skipped (already at version %d).", current)
 
     await _seed_admin_from_env(db)

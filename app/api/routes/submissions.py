@@ -28,6 +28,9 @@ async def create_submission(payload: SubmissionCreate, db: AsyncIOMotorDatabase 
     doc = {
         "device_id": payload.device_id,
         "title": payload.title or "My Property",
+        "name": payload.name,
+        "whatsapp": payload.whatsapp,
+        "email": payload.email,
         "items": items,
         "created_at": now_utc(),
     }
