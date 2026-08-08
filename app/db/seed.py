@@ -284,7 +284,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 4
+SEED_VERSION = 7
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:

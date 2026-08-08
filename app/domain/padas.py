@@ -74,6 +74,50 @@ def _nakshatra_for(center_deg: float) -> str:
     return NAKSHATRA_27[(int(center_deg // (360 / 27)) + 7) % 27]
 
 
+# Corner / zone name (Kon) per 8-wind direction. Admin-editable.
+CORNER_8 = {
+    "N":  "Uttar Disha (Kubera Sthan)",
+    "NE": "Ishanya Kon (ईशान्य कोण)",
+    "E":  "Purva Disha (Indra Sthan)",
+    "SE": "Agneya Kon (आग्नेय कोण / Fire Corner)",
+    "S":  "Dakshin Disha (Yama Sthan)",
+    "SW": "Nairitya Kon (नैऋत्य कोण)",
+    "W":  "Paschim Disha (Varuna Sthan)",
+    "NW": "Vayavya Kon (वायव्य कोण / Air Corner)",
+}
+
+# --- VASTU 7D NEXUS master-code data (per 8-wind lord/planet/day/metal) ---
+DIR8_ATTRS = {
+    "N":  {"lord": "Kubera",        "planet": "Mercury", "day": "Wednesday", "metal": "Brass"},
+    "NE": {"lord": "Ishwar (Shiva)", "planet": "Jupiter", "day": "Thursday",  "metal": "Gold"},
+    "E":  {"lord": "Indra",         "planet": "Sun",     "day": "Sunday",    "metal": "Gold"},
+    "SE": {"lord": "Agni",          "planet": "Venus",   "day": "Friday",    "metal": "Silver"},
+    "S":  {"lord": "Yama",          "planet": "Mars",    "day": "Tuesday",   "metal": "Copper"},
+    "SW": {"lord": "Nairitya",      "planet": "Rahu",    "day": "Saturday",  "metal": "Lead"},
+    "W":  {"lord": "Varuna",        "planet": "Saturn",  "day": "Saturday",  "metal": "Stainless Steel"},
+    "NW": {"lord": "Vayu",          "planet": "Moon",    "day": "Monday",    "metal": "Silver"},
+}
+
+# Colour remedies derived from the five-element (Panch-Tattva) cycle.
+ELEMENT_COLOURS = {
+    "Water": {"self": "Blue",  "destruct": "Yellow",        "enhance": "White or Grey", "exhaust": "Green",         "acceptable": "White or Grey or Blue or Black"},
+    "Air":   {"self": "Green", "destruct": "Grey or White", "enhance": "Blue",          "exhaust": "Red",           "acceptable": "Blue or Black"},
+    "Fire":  {"self": "Red",   "destruct": "Blue",          "enhance": "Green",         "exhaust": "Yellow",        "acceptable": "Green or Red"},
+    "Earth": {"self": "Yellow", "destruct": "Green",        "enhance": "Red",           "exhaust": "White or Grey", "acceptable": "Red or Yellow"},
+}
+ELEMENT_SHAPE = {"Water": "Rectangle", "Air": "Rectangle", "Fire": "Triangle", "Earth": "Square"}
+
+# Relationship / life-area detail per 16-wind zone (dummy defaults, admin-editable).
+RELATIONSHIP_16 = {
+    "N": "Career, Business Deals", "NNE": "Doctors, Wellness", "NE": "Mentors, Gurus",
+    "ENE": "Friends, Recreation", "E": "Social Circle, Networking", "ESE": "Advisors, Critics",
+    "SE": "Bankers, Cash Flow", "SSE": "Authority, Leadership", "S": "Public, Reputation",
+    "SSW": "Letting Go, Expenses", "SW": "Spouse, Life Partner", "WSW": "Teachers, Students",
+    "W": "Clients, Profits", "WNW": "Isolation, Detox", "NW": "Support, Helpers",
+    "NNW": "Sex-Partner, Extra Marital Affair",
+}
+
+
 # 32 boundary devatas / nakshatra-style names of the Vastu Purusha Mandala,
 # best-effort clockwise order starting at N5 (due North). Admin-editable.
 PADA_NAMES = [
@@ -130,6 +174,19 @@ def build_padas() -> list[dict]:
             "life_aspect": attrs["life_aspect"],
             "nakshatra": _nakshatra_for(center),
             "color": ZONE_COLOR[d16],
+            # ---- 7D NEXUS master code ----
+            "corner": CORNER_8[d8],
+            "lord": DIR8_ATTRS[d8]["lord"],
+            "planet": DIR8_ATTRS[d8]["planet"],
+            "day": DIR8_ATTRS[d8]["day"],
+            "metal": DIR8_ATTRS[d8]["metal"],
+            "shape": ELEMENT_SHAPE.get(attrs["element"], "Rectangle"),
+            "self_colour": ELEMENT_COLOURS[attrs["element"]]["self"],
+            "destruct_colour": ELEMENT_COLOURS[attrs["element"]]["destruct"],
+            "enhance_colour": ELEMENT_COLOURS[attrs["element"]]["enhance"],
+            "exhaust_colour": ELEMENT_COLOURS[attrs["element"]]["exhaust"],
+            "acceptable_colour": ELEMENT_COLOURS[attrs["element"]]["acceptable"],
+            "relationship": RELATIONSHIP_16[d16],
             "default_verdict": "average",
             "description": None,
             "is_active": True,
