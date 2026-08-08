@@ -95,6 +95,16 @@ ELEMENT_COLOURS = {
 }
 ELEMENT_SHAPE = {"Water": "Rectangle", "Air": "Rectangle", "Fire": "Triangle", "Earth": "Square"}
 
+# Relationship / life-area detail per 16-wind zone (dummy defaults, admin-editable).
+RELATIONSHIP_16 = {
+    "N": "Career, Business Deals", "NNE": "Doctors, Wellness", "NE": "Mentors, Gurus",
+    "ENE": "Friends, Recreation", "E": "Social Circle, Networking", "ESE": "Advisors, Critics",
+    "SE": "Bankers, Cash Flow", "SSE": "Authority, Leadership", "S": "Public, Reputation",
+    "SSW": "Letting Go, Expenses", "SW": "Spouse, Life Partner", "WSW": "Teachers, Students",
+    "W": "Clients, Profits", "WNW": "Isolation, Detox", "NW": "Support, Helpers",
+    "NNW": "Sex-Partner, Extra Marital Affair",
+}
+
 
 # 32 boundary devatas / nakshatra-style names of the Vastu Purusha Mandala,
 # best-effort clockwise order starting at N5 (due North). Admin-editable.
@@ -163,7 +173,7 @@ def build_padas() -> list[dict]:
             "enhance_colour": ELEMENT_COLOURS[attrs["element"]]["enhance"],
             "exhaust_colour": ELEMENT_COLOURS[attrs["element"]]["exhaust"],
             "acceptable_colour": ELEMENT_COLOURS[attrs["element"]]["acceptable"],
-            "relationship": None,
+            "relationship": RELATIONSHIP_16[d16],
             "default_verdict": "average",
             "description": None,
             "is_active": True,
