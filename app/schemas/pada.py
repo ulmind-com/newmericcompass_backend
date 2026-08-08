@@ -29,6 +29,18 @@ class PadaBase(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    # 7D NEXUS master code
+    lord: Optional[str] = None
+    planet: Optional[str] = None
+    metal: Optional[str] = None
+    shape: Optional[str] = None
+    day: Optional[str] = None
+    self_colour: Optional[str] = None
+    destruct_colour: Optional[str] = None
+    enhance_colour: Optional[str] = None
+    exhaust_colour: Optional[str] = None
+    acceptable_colour: Optional[str] = None
+    relationship: Optional[str] = None
     default_verdict: Verdict = Verdict.AVERAGE
     description: Optional[str] = None
     is_active: bool = True
@@ -49,6 +61,17 @@ class PadaUpdate(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    lord: Optional[str] = None
+    planet: Optional[str] = None
+    metal: Optional[str] = None
+    shape: Optional[str] = None
+    day: Optional[str] = None
+    self_colour: Optional[str] = None
+    destruct_colour: Optional[str] = None
+    enhance_colour: Optional[str] = None
+    exhaust_colour: Optional[str] = None
+    acceptable_colour: Optional[str] = None
+    relationship: Optional[str] = None
     default_verdict: Optional[Verdict] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
