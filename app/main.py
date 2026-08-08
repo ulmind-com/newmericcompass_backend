@@ -15,11 +15,17 @@ setup_logging()
 
 logger = logging.getLogger(__name__)
 
+from app.core.firebase import initialize_firebase
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup actions
-    await connect_to_mongo()
+    # Initialize services
+    setup_logging()
     configure_cloudinary()
+    initialize_firebase()
+    
+    # Connect to MongoDB
+    await connect_to_mongo()
     try:
         await ensure_seed_data(get_database())
     except Exception as exc:  # never let seeding block startup
