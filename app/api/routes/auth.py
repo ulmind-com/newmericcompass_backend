@@ -18,6 +18,7 @@ from app.schemas.admin import AdminProfile, Token
 from pydantic import BaseModel
 from datetime import datetime
 from app.core.firebase import verify_firebase_token
+from app.schemas.common import now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +87,10 @@ async def google_login(request: GoogleLoginRequest):
         new_user = {
             "email": email,
             "name": name,
+            "whatsapp": None,
+            "phone": None,
             "firebase_uid": uid,
-            "created_at": datetime.utcnow(),
+            "created_at": now_utc(),
             "role": "user",
             "is_premium": False,
             "status": "active"
