@@ -74,6 +74,18 @@ def _nakshatra_for(center_deg: float) -> str:
     return NAKSHATRA_27[(int(center_deg // (360 / 27)) + 7) % 27]
 
 
+# Corner / zone name (Kon) per 8-wind direction. Admin-editable.
+CORNER_8 = {
+    "N":  "Uttar Disha (Kubera Sthan)",
+    "NE": "Ishanya Kon (ईशान्य कोण)",
+    "E":  "Purva Disha (Indra Sthan)",
+    "SE": "Agneya Kon (आग्नेय कोण / Fire Corner)",
+    "S":  "Dakshin Disha (Yama Sthan)",
+    "SW": "Nairitya Kon (नैऋत्य कोण)",
+    "W":  "Paschim Disha (Varuna Sthan)",
+    "NW": "Vayavya Kon (वायव्य कोण / Air Corner)",
+}
+
 # --- VASTU 7D NEXUS master-code data (per 8-wind lord/planet/day/metal) ---
 DIR8_ATTRS = {
     "N":  {"lord": "Kubera",        "planet": "Mercury", "day": "Wednesday", "metal": "Brass"},
@@ -163,6 +175,7 @@ def build_padas() -> list[dict]:
             "nakshatra": _nakshatra_for(center),
             "color": ZONE_COLOR[d16],
             # ---- 7D NEXUS master code ----
+            "corner": CORNER_8[d8],
             "lord": DIR8_ATTRS[d8]["lord"],
             "planet": DIR8_ATTRS[d8]["planet"],
             "day": DIR8_ATTRS[d8]["day"],

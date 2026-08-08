@@ -30,6 +30,7 @@ class PadaBase(BaseModel):
     nakshatra: Optional[str] = None
     color: Optional[str] = None
     # 7D NEXUS master code
+    corner: Optional[str] = None
     lord: Optional[str] = None
     planet: Optional[str] = None
     metal: Optional[str] = None
@@ -61,6 +62,7 @@ class PadaUpdate(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    corner: Optional[str] = None
     lord: Optional[str] = None
     planet: Optional[str] = None
     metal: Optional[str] = None
