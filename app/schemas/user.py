@@ -38,3 +38,10 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserProfile
+
+class VerifyOTPRequest(BaseModel):
+    email: str
+    otp: str
+
+class ResendOTPRequest(BaseModel):
+    email: str
