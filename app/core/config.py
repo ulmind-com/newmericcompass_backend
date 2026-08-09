@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Firebase
     FIREBASE_CREDENTIALS_PATH: Optional[str] = "firebase-credentials.json"
     
+    # Resend Email Verification
+    RESEND_API_KEY: Optional[str] = None
+    MAIL_ADDRESS: Optional[str] = None
+    
     # Environment variables are loaded from the .env file in development
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
