@@ -45,3 +45,11 @@ class VerifyOTPRequest(BaseModel):
 
 class ResendOTPRequest(BaseModel):
     email: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str

@@ -11,7 +11,7 @@ from app.core.database import get_database
 from app.core.security import TokenData, create_access_token, get_current_user, get_password_hash, verify_password
 from app.schemas.common import now_utc, serialize_doc, serialize_docs
 from app.schemas.submission import SubmissionResponse
-from app.schemas.user import AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate, VerifyOTPRequest, ResendOTPRequest
+from app.schemas.user import AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate, VerifyOTPRequest, ResendOTPRequest, ForgotPasswordRequest, ResetPasswordRequest
 
 import resend
 import random
@@ -135,6 +135,42 @@ async def resend_otp(payload: ResendOTPRequest, db: AsyncIOMotorDatabase = Depen
         
     await _generate_and_send_otp(db, email, user.get("name", ""))
     return {"message": "OTP resent successfully"}
+
+@router.post("/forgot-password", response_model=dict)
+async def forgot_password(payload: ForgotPasswordRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    email = payload.email.lower().strip()
+    user = await db[USERS].find_one({"email": email})
+    
+    # We return a generic success message to prevent email enumeration,
+    # but we only actually send the email if the user exists and is active.
+    if user and user.get("status") != "blocked":
+        await _generate_and_send_otp(db, email, user.get("name", ""))
+        
+    return {"message": "If an account with that email exists, a password reset code has been sent."}
+
+@router.post("/reset-password", response_model=dict)
+async def reset_password(payload: ResetPasswordRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    email = payload.email.lower().strip()
+    otp_record = await db["otps"].find_one({"email": email, "otp": payload.otp})
+    
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+        
+    if otp_record.get("expires_at", now_utc()) < now_utc():
+        raise HTTPException(status_code=400, detail="OTP has expired")
+        
+    user = await db[USERS].find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    await db[USERS].update_one(
+        {"email": email},
+        {"$set": {"hashed_password": get_password_hash(payload.new_password)}}
+    )
+    
+    await db["otps"].delete_one({"email": email})
+    
+    return {"message": "Password reset successfully"}
 
 
 @router.get("/me", response_model=UserProfile)
