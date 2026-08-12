@@ -218,6 +218,41 @@ async def _seed_categories_and_rules(db: AsyncIOMotorDatabase) -> None:
     logger.info("Seeded %d categories and %d rules.", len(PROFILES), rule_count)
 
 
+# Starter pricing so the app has something to show on day one. The admin edits
+# these from the panel; they are only inserted when the collection is empty, so
+# a live price is never overwritten by a redeploy.
+STARTER_PLANS = [
+    {"slug": "submissions-monthly", "feature": "submissions", "kind": "subscription",
+     "name": "Monthly", "description": "Send placement reports for a month.",
+     "amount": 49900, "currency": "INR", "duration_days": 30, "submission_quota": 25,
+     "is_popular": False, "is_active": True, "order": 0},
+    {"slug": "submissions-yearly", "feature": "submissions", "kind": "subscription",
+     "name": "Yearly", "description": "A year of reports, at a better rate.",
+     "amount": 399900, "currency": "INR", "duration_days": 365, "submission_quota": 400,
+     "is_popular": True, "is_active": True, "order": 1},
+    {"slug": "submissions-lifetime", "feature": "submissions", "kind": "subscription",
+     "name": "Lifetime", "description": "Unlimited reports, no renewal.",
+     "amount": 999900, "currency": "INR", "duration_days": None, "submission_quota": None,
+     "is_popular": False, "is_active": True, "order": 2},
+    {"slug": "analysis-unlock", "feature": "analysis", "kind": "one_time",
+     "name": "Unlock Analysis", "description": "Zone verdicts, effects and treatments. One payment, forever.",
+     "amount": 29900, "currency": "INR", "duration_days": None, "submission_quota": None,
+     "is_popular": False, "is_active": True, "order": 0},
+    {"slug": "nexus-unlock", "feature": "nexus", "kind": "one_time",
+     "name": "Unlock 7D Nexus", "description": "The full master code: lord, planet, metal, shape and colour remedies.",
+     "amount": 49900, "currency": "INR", "duration_days": None, "submission_quota": None,
+     "is_popular": False, "is_active": True, "order": 0},
+]
+
+
+async def _seed_plans(db: AsyncIOMotorDatabase) -> None:
+    if await db.plans.count_documents({}) > 0:
+        logger.info("Plans already present; leaving pricing alone.")
+        return
+    await db.plans.insert_many([{**p, "created_at": datetime.now(timezone.utc)} for p in STARTER_PLANS])
+    logger.info("Seeded %d starter plans.", len(STARTER_PLANS))
+
+
 async def _seed_demo(db: AsyncIOMotorDatabase) -> None:
     """Insert demo users / submissions / tips so every admin page has data.
     Each collection is only touched when empty, so real sign-ups are never lost."""
@@ -284,7 +319,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 8
+SEED_VERSION = 9
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
@@ -296,6 +331,7 @@ async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> Non
     if force or current < SEED_VERSION:
         await _seed_padas(db)
         await _seed_categories_and_rules(db)
+        await _seed_plans(db)
         await _seed_demo(db)
         await db.meta.update_one({"_id": "seed"}, {"$set": {"version": SEED_VERSION}}, upsert=True)
         logger.info("Seed complete (version %d).", SEED_VERSION)
