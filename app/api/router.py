@@ -4,6 +4,7 @@ from app.api.routes import (
     admin_applinks,
     admin_billing,
     admin_categories,
+    admin_days,
     admin_dashboard,
     admin_padas,
     admin_rules,
@@ -37,6 +38,7 @@ api_router.include_router(admin_dashboard.router, prefix="/admin", tags=["Admin 
 api_router.include_router(admin_applinks.router, prefix="/admin/app", tags=["Admin App Links"])
 api_router.include_router(admin_billing.router, prefix="/admin/billing", tags=["Admin Billing"])
 api_router.include_router(admin_categories.router, prefix="/admin/categories", tags=["Admin Categories"])
+api_router.include_router(admin_days.router, prefix="/admin/days", tags=["Admin Day Protocols"])
 api_router.include_router(admin_padas.router, prefix="/admin/padas", tags=["Admin Padas"])
 api_router.include_router(admin_rules.router, prefix="/admin/rules", tags=["Admin Rules"])
 api_router.include_router(admin_submissions.router, prefix="/admin/submissions", tags=["Admin Submissions"])

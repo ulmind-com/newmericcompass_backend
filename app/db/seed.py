@@ -274,6 +274,110 @@ async def _seed_app_links(db: AsyncIOMotorDatabase) -> None:
     logger.info("Seeded %d placeholder menu links.", len(STARTER_LINKS))
 
 
+# The owner's day-wise remedial protocol. Only inserted when the collection is
+# empty, so edits made in the panel survive a redeploy.
+DAY_PROTOCOLS = [
+    {
+        "weekday": 0, "day_name": "Monday", "planet": "Moon", "energy": "Moon Energy",
+        "objective": "Emotional stability, peace and mental clarity.",
+        "actions": [
+            "Keep the North-West clean and well ventilated.",
+            "Remove unused containers and stagnant-water sources.",
+            "Use white, cream or soft silver tones where appropriate.",
+            "Spend a few minutes in a calm, clean area for meditation or prayer.",
+            "Check whether emotional disturbances are being reinforced by clutter or poor ventilation.",
+        ],
+        "deep_logic": "Monday is associated with the Moon, so the remedy should emphasise fluidity, cleanliness, emotional calm and environmental freshness rather than aggressive activation.",
+        "focus_zones": ["NW"], "color": "#8FA8C8", "is_active": True,
+    },
+    {
+        "weekday": 1, "day_name": "Tuesday", "planet": "Mars", "energy": "Mars Energy",
+        "objective": "Controlled action, courage and productivity.",
+        "actions": [
+            "Inspect the South and South-East for clutter or dysfunctional electrical/fire equipment.",
+            "Keep cooking/fire-related areas clean and operational.",
+            "Repair damaged electrical switches, appliances and wiring.",
+            "Avoid unnecessarily increasing red colour throughout the property.",
+            "Channel Tuesday energy toward physical work, maintenance and pending repairs.",
+        ],
+        "deep_logic": "Mars represents active/fire-like energy. The goal is controlled activation, not simply adding more fire symbolism.",
+        "focus_zones": ["S", "SE"], "color": "#D5432E", "is_active": True,
+    },
+    {
+        "weekday": 2, "day_name": "Wednesday", "planet": "Mercury", "energy": "Mercury Energy",
+        "objective": "Communication, business efficiency and intellectual activity.",
+        "actions": [
+            "Clean and organise the North zone.",
+            "Arrange business documents, accounts and communication equipment.",
+            "Remove obsolete files and unnecessary paperwork.",
+            "Keep the entrance to the workspace unobstructed.",
+            "Green may be used as an accent where aesthetically suitable.",
+        ],
+        "deep_logic": "Mercury-oriented remedies work best through organisation, communication and functional efficiency, not merely decorative objects.",
+        "focus_zones": ["N"], "color": "#2FA84F", "is_active": True,
+    },
+    {
+        "weekday": 3, "day_name": "Thursday", "planet": "Jupiter", "energy": "Jupiter Energy",
+        "objective": "Knowledge, growth, wisdom and prosperity.",
+        "actions": [
+            "Give special attention to the North-East.",
+            "Keep this area clean, light and uncluttered.",
+            "Avoid unnecessary heavy storage in NE.",
+            "Maintain a dedicated clean space for prayer, study or meditation if appropriate.",
+            "Yellow/golden accents can be used moderately.",
+        ],
+        "deep_logic": "In traditional Vastu practice, the NE is treated as a highly sensitive and spiritually significant zone. The practical remedy is therefore lightness, cleanliness and openness.",
+        "focus_zones": ["NE"], "color": "#D4AF37", "is_active": True,
+    },
+    {
+        "weekday": 4, "day_name": "Friday", "planet": "Venus", "energy": "Venus Energy",
+        "objective": "Harmony, relationships, comfort and refinement.",
+        "actions": [
+            "Clean bedrooms, dressing areas and commonly used comfort spaces.",
+            "Check mirrors, lighting, upholstery and decorative objects.",
+            "Remove broken decorative items.",
+            "Maintain pleasant fragrance and cleanliness.",
+            "Use elegant white, cream, pastel or other harmonious colours according to the property's overall colour plan.",
+        ],
+        "deep_logic": "Venus-oriented correction is primarily about harmony, aesthetics, cleanliness and comfort, rather than excessive luxury.",
+        "focus_zones": [], "color": "#E86A9A", "is_active": True,
+    },
+    {
+        "weekday": 5, "day_name": "Saturday", "planet": "Saturn", "energy": "Saturn Energy",
+        "objective": "Stability, discipline and maintenance.",
+        "actions": [
+            "Inspect the West and South-West.",
+            "Remove useless heavy clutter and damaged furniture.",
+            "Repair broken doors, hinges, shelves and structural maintenance issues.",
+            "Organise old records and unused materials.",
+            "Focus on completing neglected maintenance work.",
+        ],
+        "deep_logic": "Saturday is best used for correction and discipline. A practical maintenance routine is more meaningful than simply placing a symbolic remedy.",
+        "focus_zones": ["W", "SW"], "color": "#6B6560", "is_active": True,
+    },
+    {
+        "weekday": 6, "day_name": "Sunday", "planet": "Sun", "energy": "Sun Energy",
+        "objective": "Confidence, leadership and vitality.",
+        "actions": [
+            "Clean the East zone thoroughly.",
+            "Open curtains/windows where practical and allow natural morning light.",
+            "Keep the main entrance and East-facing openings clean.",
+            "Remove obstacles that unnecessarily block natural light.",
+            "Use warm, bright colours in moderation.",
+        ],
+        "deep_logic": "Sun-related Vastu practice naturally connects with light, visibility, order and vitality. Morning sunlight and a clean East zone are therefore practical first-line measures.",
+        "focus_zones": ["E"], "color": "#FF6A00", "is_active": True,
+    },
+]
+
+
+async def _seed_day_protocols(db) -> None:
+    if await db.day_protocols.count_documents({}) > 0:
+        return
+    await db.day_protocols.insert_many([dict(d) for d in DAY_PROTOCOLS])
+    logger.info("Seeded %d day protocols.", len(DAY_PROTOCOLS))
+
+
 async def _seed_demo(db: AsyncIOMotorDatabase) -> None:
     """Insert demo users / submissions / tips so every admin page has data.
     Each collection is only touched when empty, so real sign-ups are never lost."""
@@ -340,7 +444,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 12
+SEED_VERSION = 14
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
@@ -354,6 +458,7 @@ async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> Non
         await _seed_categories_and_rules(db)
         await _seed_plans(db)
         await _seed_app_links(db)
+        await _seed_day_protocols(db)
         await _seed_demo(db)
         await db.meta.update_one({"_id": "seed"}, {"$set": {"version": SEED_VERSION}}, upsert=True)
         logger.info("Seed complete (version %d).", SEED_VERSION)
