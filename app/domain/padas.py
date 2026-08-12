@@ -192,18 +192,72 @@ RELATIONSHIP_16 = {
 }
 
 
-# 32 boundary devatas / nakshatra-style names of the Vastu Purusha Mandala,
-# best-effort clockwise order starting at N5 (due North). Admin-editable.
-PADA_NAMES = [
-    "Mukhya", "Bhallat", "Soma", "Bhujag",          # N5, N6, N7, N8
-    "Aditi", "Diti", "Shikhi", "Parjanya",           # E1, E2, E3, E4
-    "Jayant", "Indra", "Surya", "Satya",             # E5, E6, E7, E8
-    "Bhrisha", "Antariksha", "Anila", "Pusha",       # S1, S2, S3, S4
-    "Vitatha", "Grihakshat", "Yama", "Gandharva",    # S5, S6, S7, S8
-    "Bhringraj", "Mriga", "Pitra", "Dauvarik",       # W1, W2, W3, W4
-    "Sugriva", "Pushpdant", "Varun", "Asur",         # W5, W6, W7, W8
-    "Shosha", "Papyakshma", "Roga", "Ahi",           # N1, N2, N3, N4
-]
+# --- The 32 entrance padas, exactly as the owner supplied ---
+# Presiding deity, the entrance challenges that pada brings, and where it falls
+# on the five-level entrance ranking. Keyed by code so the order of the wheel
+# can change without silently shifting the data.
+PADA_DEITY = {
+    "E1": "Shikhi", "E2": "Parjanya", "E3": "Jayanta", "E4": "Indra",
+    "E5": "Surya", "E6": "Satya", "E7": "Bhrisha", "E8": "Antariksha / Akasha",
+    "S1": "Anil", "S2": "Pusha", "S3": "Vitatha", "S4": "Grihakshata / Vrihattakshata",
+    "S5": "Yama", "S6": "Gandharva", "S7": "Bhringraj", "S8": "Mriga",
+    "W1": "Pitru", "W2": "Dauvarika / Dwarika", "W3": "Sugriva", "W4": "Pushpadanta / Kusumdanta",
+    "W5": "Varuna", "W6": "Asura", "W7": "Shosha", "W8": "Papyakshma",
+    "N1": "Roga", "N2": "Naga", "N3": "Mukhya", "N4": "Bhallata",
+    "N5": "Soma", "N6": "Bhujanga", "N7": "Aditi", "N8": "Diti",
+}
+
+PADA_CHALLENGE = {
+    "E1": "Fire-related concerns, accidents, financial instability, impulsive decisions",
+    "E2": "Unnecessary expenditure, resources may not accumulate easily",
+    "E3": "Generally highly favourable; excessive ambition can become a secondary issue",
+    "E4": "Generally favourable; can increase ego, authority struggles or dominance",
+    "E5": "Aggression, irritability, ego clashes, wrong decisions",
+    "E6": "Traditional interpretation associates it with unreliability/commitment problems",
+    "E7": "Insensitivity, conflicts, opposition and enemies",
+    "E8": "Financial leakage, accidents, health concerns and theft-related vulnerability",
+    "S1": "Family/son-related tensions and instability",
+    "S2": "Relative-related complications; inconsistent support",
+    "S3": "Can support prosperity/skills but may create instability or reliability issues",
+    "S4": "One of the stronger South padas; excessive pressure/competition may develop",
+    "S5": "Debt, financial pressure, fear, obstacles and heaviness",
+    "S6": "Reputation problems, instability, unnecessary expenditure",
+    "S7": "Effort-to-result imbalance, reduced motivation, frustration",
+    "S8": "Isolation, harshness, social disconnection and instability",
+    "W1": "Traditionally associated with poverty, stagnation and reduced vitality",
+    "W2": "Career instability, insecurity and family-related tensions",
+    "W3": "Strong West entrance; can support wealth and expansion",
+    "W4": "Generally favourable; may increase material orientation",
+    "W5": "Financial opportunities but also over-ambition/perfectionism",
+    "W6": "Negativity, mental pressure, authority/government complications",
+    "W7": "Stress, health concerns, financial drainage and unhealthy habits",
+    "W8": "Unethical tendencies, separation, financial/legal complications",
+    "N1": "Health-related difficulties, poor judgment and negative thinking",
+    "N2": "Fear, suspicion, opposition and conflict",
+    "N3": "One of the strongest North positions; excessive material focus can be a secondary concern",
+    "N4": "Strong prosperity potential; inherited/property-related themes",
+    "N5": "Calm, spiritual and domestic energy; excessive emotionality can occur",
+    "N6": "Opposition, quarrels, conflicts, resistance, communication gaps and feeling unheard",
+    "N7": "Traditional interpretations associate it with domestic/feminine-family tensions",
+    "N8": "Savings and financial accumulation; can increase possessiveness/material attachment",
+}
+
+# The five practical entrance levels, with the wording the owner uses for each.
+ENTRANCE_RATINGS = {
+    "excellent":   {"label": "Excellent",   "category": "Strongly favourable",     "color": "#1B7F4B", "verdict": "excellent"},
+    "good":        {"label": "Good",        "category": "Generally supportive",    "color": "#4CAF50", "verdict": "good"},
+    "conditional": {"label": "Conditional", "category": "Depends strongly on use", "color": "#E7B416", "verdict": "average"},
+    "challenging": {"label": "Challenging", "category": "Needs careful application", "color": "#F2711C", "verdict": "bad"},
+    "avoid":       {"label": "Generally Avoid for Main Entrance", "category": "Traditionally difficult", "color": "#D5432E", "verdict": "bad"},
+}
+
+PADA_RATING = {
+    **{c: "excellent"   for c in ("E3", "E4", "N3", "N4", "N5", "S4", "W4")},
+    **{c: "good"        for c in ("E5", "E6", "S3", "W3", "W5", "N8")},
+    **{c: "conditional" for c in ("E2", "S2", "S5", "W2", "W6", "N6", "N7")},
+    **{c: "challenging" for c in ("N2", "E1", "E7", "E8", "S1", "S6", "W1")},
+    **{c: "avoid"       for c in ("S7", "S8", "W7", "W8", "N1")},
+}
 
 
 def _quadrant_codes() -> list[str]:
@@ -241,7 +295,12 @@ def build_padas() -> list[dict]:
             "direction16": d16,
             "direction16_full": DIRECTION_16_FULL[d16],
             "direction8": d8,
-            "name": PADA_NAMES[i],
+            "name": PADA_DEITY[code],
+            "entrance_challenge": PADA_CHALLENGE[code],
+            "entrance_rating": PADA_RATING[code],
+            "entrance_rating_label": ENTRANCE_RATINGS[PADA_RATING[code]]["label"],
+            "entrance_rating_category": ENTRANCE_RATINGS[PADA_RATING[code]]["category"],
+            "entrance_rating_color": ENTRANCE_RATINGS[PADA_RATING[code]]["color"],
             "element": attrs["element"],
             "dosha": attrs["dosha"],
             "organ": attrs["organ"],
@@ -272,7 +331,7 @@ def build_padas() -> list[dict]:
             "exhaust_colour": ELEMENT_COLOURS[attrs["element"]]["exhaust"],
             "acceptable_colour": ELEMENT_COLOURS[attrs["element"]]["acceptable"],
             "relationship": RELATIONSHIP_16[d16],
-            "default_verdict": "average",
+            "default_verdict": ENTRANCE_RATINGS[PADA_RATING[code]]["verdict"],
             "description": None,
             "is_active": True,
         })
