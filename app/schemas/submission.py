@@ -12,6 +12,10 @@ class SubmissionItem(BaseModel):
     direction16: Optional[str] = None
     verdict: Optional[str] = None
     images: List[str] = Field(default_factory=list)  # Cloudinary URLs of the user's photos
+    # Where the photo was taken, captured from the device at shutter time.
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    accuracy: Optional[float] = None
 
 
 class SubmissionCreate(BaseModel):
