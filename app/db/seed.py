@@ -253,6 +253,27 @@ async def _seed_plans(db: AsyncIOMotorDatabase) -> None:
     logger.info("Seeded %d starter plans.", len(STARTER_PLANS))
 
 
+# Placeholder menu links so the side menu is not empty before the owner fills
+# in their real channels. Only inserted when the collection is empty.
+STARTER_LINKS = [
+    {"section": "social", "platform": "facebook", "title": "Facebook",
+     "subtitle": "Follow the page", "url": "https://facebook.com/", "order": 0, "is_active": True},
+    {"section": "social", "platform": "instagram", "title": "Instagram",
+     "subtitle": "Follow us", "url": "https://instagram.com/", "order": 1, "is_active": True},
+    {"section": "social", "platform": "youtube", "title": "YouTube",
+     "subtitle": "Subscribe", "url": "https://youtube.com/", "order": 2, "is_active": True},
+    {"section": "social", "platform": "whatsapp", "title": "WhatsApp",
+     "subtitle": "Message us", "url": "https://wa.me/", "order": 3, "is_active": True},
+]
+
+
+async def _seed_app_links(db: AsyncIOMotorDatabase) -> None:
+    if await db.app_links.count_documents({}) > 0:
+        return
+    await db.app_links.insert_many([{**l, "created_at": datetime.now(timezone.utc)} for l in STARTER_LINKS])
+    logger.info("Seeded %d placeholder menu links.", len(STARTER_LINKS))
+
+
 async def _seed_demo(db: AsyncIOMotorDatabase) -> None:
     """Insert demo users / submissions / tips so every admin page has data.
     Each collection is only touched when empty, so real sign-ups are never lost."""
@@ -319,7 +340,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 9
+SEED_VERSION = 10
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
@@ -332,6 +353,7 @@ async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> Non
         await _seed_padas(db)
         await _seed_categories_and_rules(db)
         await _seed_plans(db)
+        await _seed_app_links(db)
         await _seed_demo(db)
         await db.meta.update_one({"_id": "seed"}, {"$set": {"version": SEED_VERSION}}, upsert=True)
         logger.info("Seed complete (version %d).", SEED_VERSION)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    admin_applinks,
     admin_billing,
     admin_categories,
     admin_dashboard,
@@ -33,6 +34,7 @@ api_router.include_router(users.router, prefix="/users", tags=["App Users"])
 
 # ---- Admin ----
 api_router.include_router(admin_dashboard.router, prefix="/admin", tags=["Admin Dashboard"])
+api_router.include_router(admin_applinks.router, prefix="/admin/app", tags=["Admin App Links"])
 api_router.include_router(admin_billing.router, prefix="/admin/billing", tags=["Admin Billing"])
 api_router.include_router(admin_categories.router, prefix="/admin/categories", tags=["Admin Categories"])
 api_router.include_router(admin_padas.router, prefix="/admin/padas", tags=["Admin Padas"])
