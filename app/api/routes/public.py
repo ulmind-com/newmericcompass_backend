@@ -8,6 +8,7 @@ from app.core.database import get_database
 from app.domain.padas import COMPASS_CHART
 from app.schemas.category import CategoryResponse
 from app.schemas.common import serialize_docs
+from app.schemas.applink import ShareSettings
 from app.schemas.pada import PadaResponse
 from app.schemas.tip import TipResponse
 
@@ -48,6 +49,11 @@ async def list_tips(db: AsyncIOMotorDatabase = Depends(get_database)):
 async def app_config(db: AsyncIOMotorDatabase = Depends(get_database)):
     categories = await _active_categories(db)
     padas = await _active_padas(db)
+    links = serialize_docs(
+        await db["app_links"].find({"is_active": True}).sort([("section", 1), ("order", 1)]).to_list(length=200)
+    )
+    share_doc = await db["app_settings"].find_one({"_id": "share"}) or {}
+    share_doc.pop("_id", None)
     return {
         "app": {
             "name": "Newmeric Compass",
@@ -67,6 +73,9 @@ async def app_config(db: AsyncIOMotorDatabase = Depends(get_database)):
             "acharya_phone": settings.ACHARYA_PHONE,
             "acharya_whatsapp": settings.ACHARYA_WHATSAPP or settings.ACHARYA_PHONE,
         },
+        "essentials": [l for l in links if l.get("section") == "essentials"],
+        "socials": [l for l in links if l.get("section") == "social"],
+        "share": ShareSettings(**share_doc).model_dump(),
         "categories": categories,
         "padas": padas,
     }

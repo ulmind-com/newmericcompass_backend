@@ -23,6 +23,7 @@ from app.schemas.billing import (
     OrderCreate,
     OrderResponse,
     PaymentVerify,
+    PaymentResponse,
     PlanResponse,
 )
 from app.schemas.common import now_utc, serialize_docs
@@ -48,6 +49,16 @@ async def my_access(
 ):
     email = bl.normalize_email(current.email)
     return MyAccessResponse(email=email, features=await bl.access_map(db, email))
+
+
+@router.get("/history", response_model=list[PaymentResponse], summary="This user's purchases")
+async def my_purchases(
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    email = bl.normalize_email(current.email)
+    cursor = db[bl.PAYMENTS].find({"user_email": email}).sort("created_at", -1)
+    return serialize_docs(await cursor.to_list(length=200))
 
 
 @router.post("/order", response_model=OrderResponse, summary="Start a payment")
