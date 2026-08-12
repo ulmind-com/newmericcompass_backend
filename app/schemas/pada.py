@@ -29,6 +29,15 @@ class PadaBase(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    # printed-chart ring colours
+    life_color: Optional[str] = None
+    dir_color: Optional[str] = None
+    dir_text_color: Optional[str] = None
+    pada_color: Optional[str] = None
+    devata_color: Optional[str] = None
+    nakshatra_color: Optional[str] = None
+    brahma_name: Optional[str] = None
+    brahma_color: Optional[str] = None
     # 7D NEXUS master code
     corner: Optional[str] = None
     lord: Optional[str] = None
@@ -62,6 +71,14 @@ class PadaUpdate(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    life_color: Optional[str] = None
+    dir_color: Optional[str] = None
+    dir_text_color: Optional[str] = None
+    pada_color: Optional[str] = None
+    devata_color: Optional[str] = None
+    nakshatra_color: Optional[str] = None
+    brahma_name: Optional[str] = None
+    brahma_color: Optional[str] = None
     corner: Optional[str] = None
     lord: Optional[str] = None
     planet: Optional[str] = None

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_database
+from app.domain.padas import COMPASS_CHART
 from app.schemas.category import CategoryResponse
 from app.schemas.common import serialize_docs
 from app.schemas.pada import PadaResponse
@@ -59,6 +60,7 @@ async def app_config(db: AsyncIOMotorDatabase = Depends(get_database)):
                 "accentGreen": "#0B6E4F",
             },
         },
+        "compass": COMPASS_CHART,
         "categories": categories,
         "padas": padas,
     }
