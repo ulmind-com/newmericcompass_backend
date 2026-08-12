@@ -172,13 +172,76 @@ DIR8_ATTRS = {
            "planet": "Jupiter", "day": "Thursday",  "metal": "Gold"},
 }
 
-# Colour remedies derived from the five-element (Panch-Tattva) cycle.
-ELEMENT_COLOURS = {
-    "Water": {"self": "Blue",  "destruct": "Yellow",        "enhance": "White or Grey", "exhaust": "Green",         "acceptable": "White or Grey or Blue or Black"},
-    "Air":   {"self": "Green", "destruct": "Grey or White", "enhance": "Blue",          "exhaust": "Red",           "acceptable": "Blue or Black"},
-    "Fire":  {"self": "Red",   "destruct": "Blue",          "enhance": "Green",         "exhaust": "Yellow",        "acceptable": "Green or Red"},
-    "Earth": {"self": "Yellow", "destruct": "Green",        "enhance": "Red",           "exhaust": "White or Grey", "acceptable": "Red or Yellow"},
+# --- Vastu 8-Directional Colour Intelligence Matrix (owner's table) ---
+# Per 8-wind direction: its primary element and the five colour bands. These
+# replace the element-derived guesses; every value is admin-editable per pada.
+DIR8_COLOURS = {
+    "E": {
+        "primary_element": "Wood / Solar",
+        "self": "Light Green, Leaf Green",
+        "enhance": "Fresh Green, Mint, Soft Yellow",
+        "acceptable": "White, Ivory, Light Beige",
+        "destruct": "Black, Charcoal, Deep Grey",
+        "exhaust": "Excessive Red, Orange, Strong Purple",
+    },
+    "SE": {
+        "primary_element": "Fire",
+        "self": "Light Red, Coral, Peach",
+        "enhance": "Orange, Terracotta, Rose, Warm Pink",
+        "acceptable": "Cream, Beige, Light Green",
+        "destruct": "Black, Dark Blue, Deep Navy",
+        "exhaust": "Excessive White, Silver, Grey",
+    },
+    "S": {
+        "primary_element": "Fire",
+        "self": "Red, Coral, Terracotta",
+        "enhance": "Orange, Peach, Maroon, Warm Pink",
+        "acceptable": "Cream, Beige, Light Brown",
+        "destruct": "Black, Deep Blue, Dark Navy",
+        "exhaust": "Excessive White, Silver, Metallic Grey",
+    },
+    "SW": {
+        "primary_element": "Earth",
+        "self": "Beige, Sand, Cream, Earth Brown",
+        "enhance": "Mustard, Ochre, Terracotta, Warm Yellow",
+        "acceptable": "Peach, Soft Pink, Light Brown",
+        "destruct": "Deep Blue, Black, Excessive Green",
+        "exhaust": "Excessive Red, Bright Orange, Strong Fire tones",
+    },
+    "W": {
+        "primary_element": "Metal",
+        "self": "White, Off-White, Silver",
+        "enhance": "Light Grey, Metallic, Cream",
+        "acceptable": "Beige, Soft Blue",
+        "destruct": "Strong Red, Bright Orange",
+        "exhaust": "Excessive Green, Deep Brown",
+    },
+    "NW": {
+        "primary_element": "Air / Metal",
+        "self": "White, Light Grey",
+        "enhance": "Silver, Cream, Very Light Blue",
+        "acceptable": "Beige, Soft Green",
+        "destruct": "Deep Red, Dark Orange",
+        "exhaust": "Excessive Black, Heavy Brown, Deep Green",
+    },
+    "N": {
+        "primary_element": "Water",
+        "self": "Light Blue, Aqua",
+        "enhance": "Sea Green, Mint, Blue-Green",
+        "acceptable": "White, Silver, Light Grey",
+        "destruct": "Strong Red, Deep Orange",
+        "exhaust": "Excessive Yellow, Mustard, Heavy Earth Brown",
+    },
+    "NE": {
+        "primary_element": "Water / Spiritual",
+        "self": "Very Light Yellow, Cream, White",
+        "enhance": "Light Blue, Aqua, Pale Green",
+        "acceptable": "Ivory, Soft Beige, Silver",
+        "destruct": "Black, Charcoal, Dark Red",
+        "exhaust": "Excessive Orange, Maroon, Heavy Brown",
+    },
 }
+
 ELEMENT_SHAPE = {"Water": "Rectangle", "Air": "Rectangle", "Fire": "Triangle", "Earth": "Square"}
 
 # Relationship / life-area detail per 16-wind zone (dummy defaults, admin-editable).
@@ -325,11 +388,12 @@ def build_padas() -> list[dict]:
             "day": DIR8_ATTRS[d8]["day"],
             "metal": DIR8_ATTRS[d8]["metal"],
             "shape": ELEMENT_SHAPE.get(attrs["element"], "Rectangle"),
-            "self_colour": ELEMENT_COLOURS[attrs["element"]]["self"],
-            "destruct_colour": ELEMENT_COLOURS[attrs["element"]]["destruct"],
-            "enhance_colour": ELEMENT_COLOURS[attrs["element"]]["enhance"],
-            "exhaust_colour": ELEMENT_COLOURS[attrs["element"]]["exhaust"],
-            "acceptable_colour": ELEMENT_COLOURS[attrs["element"]]["acceptable"],
+            "primary_element": DIR8_COLOURS[d8]["primary_element"],
+            "self_colour": DIR8_COLOURS[d8]["self"],
+            "enhance_colour": DIR8_COLOURS[d8]["enhance"],
+            "acceptable_colour": DIR8_COLOURS[d8]["acceptable"],
+            "destruct_colour": DIR8_COLOURS[d8]["destruct"],
+            "exhaust_colour": DIR8_COLOURS[d8]["exhaust"],
             "relationship": RELATIONSHIP_16[d16],
             "default_verdict": ENTRANCE_RATINGS[PADA_RATING[code]]["verdict"],
             "description": None,
