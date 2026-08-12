@@ -41,6 +41,8 @@ class PadaBase(BaseModel):
     # 7D NEXUS master code
     corner: Optional[str] = None
     lord: Optional[str] = None
+    deity_english: Optional[str] = None
+    vastu_association: Optional[str] = None
     planet: Optional[str] = None
     metal: Optional[str] = None
     shape: Optional[str] = None
@@ -81,6 +83,8 @@ class PadaUpdate(BaseModel):
     brahma_color: Optional[str] = None
     corner: Optional[str] = None
     lord: Optional[str] = None
+    deity_english: Optional[str] = None
+    vastu_association: Optional[str] = None
     planet: Optional[str] = None
     metal: Optional[str] = None
     shape: Optional[str] = None
