@@ -29,6 +29,12 @@ class PadaBase(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    # entrance pada: presiding deity (name), its challenges and its ranking
+    entrance_challenge: Optional[str] = None
+    entrance_rating: Optional[str] = None
+    entrance_rating_label: Optional[str] = None
+    entrance_rating_category: Optional[str] = None
+    entrance_rating_color: Optional[str] = None
     # printed-chart ring colours
     life_color: Optional[str] = None
     dir_color: Optional[str] = None
@@ -73,6 +79,11 @@ class PadaUpdate(BaseModel):
     life_aspect: Optional[str] = None
     nakshatra: Optional[str] = None
     color: Optional[str] = None
+    entrance_challenge: Optional[str] = None
+    entrance_rating: Optional[str] = None
+    entrance_rating_label: Optional[str] = None
+    entrance_rating_category: Optional[str] = None
+    entrance_rating_color: Optional[str] = None
     life_color: Optional[str] = None
     dir_color: Optional[str] = None
     dir_text_color: Optional[str] = None
