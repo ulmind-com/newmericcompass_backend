@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     RESEND_API_KEY: Optional[str] = None
     MAIL_ADDRESS: Optional[str] = None
     
+    # Acharya the app offers to call for a treatment consultation.
+    ACHARYA_NAME: str = "N5 Acharya"
+    ACHARYA_PHONE: Optional[str] = None
+    ACHARYA_WHATSAPP: Optional[str] = None
+
     # Environment variables are loaded from the .env file in development
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

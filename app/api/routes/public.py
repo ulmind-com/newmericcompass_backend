@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.config import settings
 from app.core.database import get_database
 from app.domain.padas import COMPASS_CHART
 from app.schemas.category import CategoryResponse
@@ -61,6 +62,11 @@ async def app_config(db: AsyncIOMotorDatabase = Depends(get_database)):
             },
         },
         "compass": COMPASS_CHART,
+        "support": {
+            "acharya_name": settings.ACHARYA_NAME,
+            "acharya_phone": settings.ACHARYA_PHONE,
+            "acharya_whatsapp": settings.ACHARYA_WHATSAPP or settings.ACHARYA_PHONE,
+        },
         "categories": categories,
         "padas": padas,
     }
