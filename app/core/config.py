@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     ACHARYA_PHONE: Optional[str] = None
     ACHARYA_WHATSAPP: Optional[str] = None
 
+    # Razorpay. Both come from the environment; the secret is never committed.
+    RAZORPAY_KEY_ID: Optional[str] = None
+    RAZORPAY_KEY_SECRET: Optional[str] = None
+    # Where this API is reachable from a phone - used to build the checkout URL.
+    PUBLIC_BASE_URL: str = "https://newmericcompass-backend.onrender.com"
+
     # Environment variables are loaded from the .env file in development
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

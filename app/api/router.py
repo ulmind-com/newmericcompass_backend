@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    admin_billing,
     admin_categories,
     admin_dashboard,
     admin_padas,
@@ -9,6 +10,7 @@ from app.api.routes import (
     admin_tips,
     admin_uploads,
     auth,
+    billing,
     public,
     submissions,
     uploads,
@@ -23,6 +25,7 @@ api_router.include_router(public.router, tags=["Public"])
 api_router.include_router(vastu.router, prefix="/vastu", tags=["Vastu Engine"])
 api_router.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
 api_router.include_router(uploads.router, prefix="/uploads", tags=["Uploads"])
+api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
 
 # ---- Auth ----
 api_router.include_router(auth.router, prefix="/auth", tags=["Admin Auth"])
@@ -30,6 +33,7 @@ api_router.include_router(users.router, prefix="/users", tags=["App Users"])
 
 # ---- Admin ----
 api_router.include_router(admin_dashboard.router, prefix="/admin", tags=["Admin Dashboard"])
+api_router.include_router(admin_billing.router, prefix="/admin/billing", tags=["Admin Billing"])
 api_router.include_router(admin_categories.router, prefix="/admin/categories", tags=["Admin Categories"])
 api_router.include_router(admin_padas.router, prefix="/admin/padas", tags=["Admin Padas"])
 api_router.include_router(admin_rules.router, prefix="/admin/rules", tags=["Admin Rules"])
