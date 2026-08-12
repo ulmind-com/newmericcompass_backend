@@ -141,16 +141,35 @@ CORNER_8 = {
     "NW": "Vayavya Kon (वायव्य कोण / Air Corner)",
 }
 
-# --- VASTU 7D NEXUS master-code data (per 8-wind lord/planet/day/metal) ---
+# --- The 8 Asta Dikpala (guardian deities), exactly as the owner supplied ---
+# Each 8-wind direction has a guardian, its English identification, and the
+# Vastu quality that direction governs. Seeded from this table and editable
+# per pada from the admin panel.
 DIR8_ATTRS = {
-    "N":  {"lord": "Kubera",        "planet": "Mercury", "day": "Wednesday", "metal": "Brass"},
-    "NE": {"lord": "Ishwar (Shiva)", "planet": "Jupiter", "day": "Thursday",  "metal": "Gold"},
-    "E":  {"lord": "Indra",         "planet": "Sun",     "day": "Sunday",    "metal": "Gold"},
-    "SE": {"lord": "Agni",          "planet": "Venus",   "day": "Friday",    "metal": "Silver"},
-    "S":  {"lord": "Yama",          "planet": "Mars",    "day": "Tuesday",   "metal": "Copper"},
-    "SW": {"lord": "Nairitya",      "planet": "Rahu",    "day": "Saturday",  "metal": "Lead"},
-    "W":  {"lord": "Varuna",        "planet": "Saturn",  "day": "Saturday",  "metal": "Stainless Steel"},
-    "NW": {"lord": "Vayu",          "planet": "Moon",    "day": "Monday",    "metal": "Silver"},
+    "E":  {"lord": "Indra",              "deity_english": "Lord Indra",
+           "vastu_association": "Power, authority, prosperity, leadership",
+           "planet": "Sun",     "day": "Sunday",    "metal": "Gold"},
+    "SE": {"lord": "Agni",               "deity_english": "God of Fire",
+           "vastu_association": "Fire, energy, transformation",
+           "planet": "Venus",   "day": "Friday",    "metal": "Silver"},
+    "S":  {"lord": "Yama",               "deity_english": "Lord of Dharma & Death",
+           "vastu_association": "Discipline, justice, restraint",
+           "planet": "Mars",    "day": "Tuesday",   "metal": "Copper"},
+    "SW": {"lord": "Nairṛitya",          "deity_english": "Deity of dissolution / protection",
+           "vastu_association": "Stability, protection, containment",
+           "planet": "Rahu",    "day": "Saturday",  "metal": "Lead"},
+    "W":  {"lord": "Varuna",             "deity_english": "Lord of Cosmic Waters",
+           "vastu_association": "Water, depth, law, flow",
+           "planet": "Saturn",  "day": "Saturday",  "metal": "Stainless Steel"},
+    "NW": {"lord": "Vaayu / Vayavya Kon", "deity_english": "God of Wind",
+           "vastu_association": "Movement, circulation, change",
+           "planet": "Moon",    "day": "Monday",    "metal": "Silver"},
+    "N":  {"lord": "Kubera",             "deity_english": "Lord of Wealth",
+           "vastu_association": "Wealth, finance, abundance",
+           "planet": "Mercury", "day": "Wednesday", "metal": "Brass"},
+    "NE": {"lord": "Isanya / Shiva",     "deity_english": "Divine aspect of Lord Shiva",
+           "vastu_association": "Spirituality, wisdom, purity, divine energy",
+           "planet": "Jupiter", "day": "Thursday",  "metal": "Gold"},
 }
 
 # Colour remedies derived from the five-element (Panch-Tattva) cycle.
@@ -241,6 +260,8 @@ def build_padas() -> list[dict]:
             # ---- 7D NEXUS master code ----
             "corner": CORNER_8[d8],
             "lord": DIR8_ATTRS[d8]["lord"],
+            "deity_english": DIR8_ATTRS[d8]["deity_english"],
+            "vastu_association": DIR8_ATTRS[d8]["vastu_association"],
             "planet": DIR8_ATTRS[d8]["planet"],
             "day": DIR8_ATTRS[d8]["day"],
             "metal": DIR8_ATTRS[d8]["metal"],
