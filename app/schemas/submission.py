@@ -5,13 +5,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SubmissionItem(BaseModel):
-    category_slug: str
+    # A capture is identified by where it was taken and which way the device
+    # faced; a room category is optional context, not a requirement.
+    category_slug: Optional[str] = None
     category_name: Optional[str] = None
     degree: float = Field(ge=0, le=360)
     pada_code: Optional[str] = None
     direction16: Optional[str] = None
     verdict: Optional[str] = None
     images: List[str] = Field(default_factory=list)  # Cloudinary URLs of the user's photos
+    # Where the photo was taken, captured from the device at shutter time.
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    accuracy: Optional[float] = None
 
 
 class SubmissionCreate(BaseModel):
