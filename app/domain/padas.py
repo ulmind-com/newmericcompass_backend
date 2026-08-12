@@ -59,6 +59,61 @@ ZONE_COLOR = {
     "W": "#DDCFEC", "WNW": "#D9C8E9", "NW": "#ECE0C6", "NNW": "#D0E6EC",
 }
 
+# --- Per-ring colours of the printed N5 chart (each one admin-editable) ---
+
+# Ring 2: pastel band behind the life-aspect wording.
+LIFE_COLOR = {
+    "N": "#CDE9EF", "NNE": "#CDE9EF", "NE": "#CDE9EF", "ENE": "#DCEFC0",
+    "E": "#DCEFC0", "ESE": "#DCEFC0", "SE": "#F7D9E4", "SSE": "#F7D9E4",
+    "S": "#F7D9E4", "SSW": "#F9EEC4", "SW": "#F9EEC4", "WSW": "#F9EEC4",
+    "W": "#EFE7D6", "WNW": "#EFE7D6", "NW": "#EFE7D6", "NNW": "#CDE9EF",
+}
+
+# Ring 4: strong band behind the 16-wind direction names.
+DIR_COLOR = {
+    "N": "#2D6FB8", "NNE": "#9E9E9E", "NE": "#EFE6D2", "ENE": "#4E9A2F",
+    "E": "#E56AA0", "ESE": "#C9E29B", "SE": "#7CB342", "SSE": "#9E9E9E",
+    "S": "#C62828", "SSW": "#F4A9C4", "SW": "#F2CE5B", "WSW": "#EFE6D2",
+    "W": "#9E9E9E", "WNW": "#8D8D8D", "NW": "#EFE6D2", "NNW": "#F2CE5B",
+}
+# Legible ink on top of DIR_COLOR.
+DIR_TEXT_COLOR = {
+    "N": "#FFFFFF", "S": "#FFFFFF", "ENE": "#FFFFFF", "SE": "#FFFFFF",
+}
+
+# Ring 5: pastel band behind the pada codes (N1..W8) — a lighter tint of the zone.
+PADA_BAND_COLOR = {
+    "N": "#E7F4F8", "NNE": "#E7F4F8", "NE": "#E7F4F8", "ENE": "#EDF7DC",
+    "E": "#EDF7DC", "ESE": "#EDF7DC", "SE": "#FCECF2", "SSE": "#FCECF2",
+    "S": "#FCECF2", "SSW": "#FDF7E2", "SW": "#FDF7E2", "WSW": "#FDF7E2",
+    "W": "#F7F2E7", "WNW": "#F7F2E7", "NW": "#F7F2E7", "NNW": "#E7F4F8",
+}
+
+# Rings 6 & 7: the devata / nakshatra bands alternate pastel per pada on the
+# printed chart. Cycle is indexed by pada order so neighbours never repeat.
+PADA_ALT_COLORS = ["#FBFAF5", "#F8DDE7", "#FBFAF5", "#DCEAF2"]
+
+# Ring 8: the four inner Vastu Purusha Mandala lords around the Brahmasthan.
+BRAHMA_QUADRANT = {
+    "N": {"name": "BHUDHAR", "color": "#CDE9EF"},
+    "E": {"name": "ARYAAMA", "color": "#F2C94C"},
+    "S": {"name": "NYASVAN", "color": "#F08BB0"},
+    "W": {"name": "MITRA", "color": "#F08BB0"},
+}
+
+# Fixed chart furniture (paper, ink, centre medallion) served through /config so
+# the app never hardcodes it and the admin can restyle the whole wheel.
+COMPASS_CHART = {
+    "paper": "#F6EFE0",
+    "line": "#C9B88F",
+    "ink": "#241C12",
+    "organ_color": "#D0021B",
+    "needle_color": "#D0021B",
+    "center_symbol": "श्री",
+    "center_label": "Brahm Sthan",
+    "center_bg": "#FFFFFF",
+}
+
 # The 27 nakshatras (lunar mansions). Each pada is assigned the nakshatra that
 # governs its arc; the offset aligns Rohini/Pushya near North as on the chart.
 NAKSHATRA_27 = [
@@ -174,6 +229,15 @@ def build_padas() -> list[dict]:
             "life_aspect": attrs["life_aspect"],
             "nakshatra": _nakshatra_for(center),
             "color": ZONE_COLOR[d16],
+            # ---- printed-chart ring colours (all admin-editable) ----
+            "life_color": LIFE_COLOR[d16],
+            "dir_color": DIR_COLOR[d16],
+            "dir_text_color": DIR_TEXT_COLOR.get(d16, "#241C12"),
+            "pada_color": PADA_BAND_COLOR[d16],
+            "devata_color": PADA_ALT_COLORS[i % len(PADA_ALT_COLORS)],
+            "nakshatra_color": PADA_ALT_COLORS[(i + 2) % len(PADA_ALT_COLORS)],
+            "brahma_name": BRAHMA_QUADRANT[code[0]]["name"],
+            "brahma_color": BRAHMA_QUADRANT[code[0]]["color"],
             # ---- 7D NEXUS master code ----
             "corner": CORNER_8[d8],
             "lord": DIR8_ATTRS[d8]["lord"],
