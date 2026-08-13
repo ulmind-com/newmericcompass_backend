@@ -14,6 +14,7 @@ from app.api.routes import (
     auth,
     billing,
     public,
+    push,
     submissions,
     uploads,
     users,
@@ -27,6 +28,7 @@ api_router.include_router(public.router, tags=["Public"])
 api_router.include_router(vastu.router, prefix="/vastu", tags=["Vastu Engine"])
 api_router.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
 api_router.include_router(uploads.router, prefix="/uploads", tags=["Uploads"])
+api_router.include_router(push.router, prefix="/push", tags=["Push"])
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
 
 # ---- Auth ----
