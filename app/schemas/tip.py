@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -13,7 +14,9 @@ class TipBase(BaseModel):
 
 
 class TipCreate(TipBase):
-    pass
+    # Adding a tip is the moment worth telling people about, so this defaults
+    # on; the admin can uncheck it for a correction or a backfill.
+    notify: bool = True
 
 
 class TipUpdate(BaseModel):
@@ -27,4 +30,6 @@ class TipUpdate(BaseModel):
 
 class TipResponse(TipBase):
     id: str
+    notified_at: Optional[datetime] = None
+    notified_count: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
