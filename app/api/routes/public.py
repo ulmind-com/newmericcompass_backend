@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.config import settings
+from app.api.routes.admin_festivals import active_festival
 from app.core.database import get_database
 from app.domain.padas import COMPASS_CHART
 from app.schemas.category import CategoryResponse
-from app.schemas.common import serialize_docs
+from app.schemas.common import serialize_doc, serialize_docs
 from app.schemas.applink import ShareSettings
 from app.schemas.pada import PadaResponse
 from app.schemas.tip import TipResponse
@@ -55,6 +56,8 @@ async def app_config(db: AsyncIOMotorDatabase = Depends(get_database)):
     days = serialize_docs(
         await db["day_protocols"].find({"is_active": True}).sort("weekday", 1).to_list(length=14)
     )
+    running = await active_festival(db)
+    festival = serialize_doc(running) if running else None
     share_doc = await db["app_settings"].find_one({"_id": "share"}) or {}
     share_doc.pop("_id", None)
     return {
@@ -80,6 +83,7 @@ async def app_config(db: AsyncIOMotorDatabase = Depends(get_database)):
         "socials": [l for l in links if l.get("section") == "social"],
         "share": ShareSettings(**share_doc).model_dump(),
         "day_protocols": days,
+        "festival": festival,
         "categories": categories,
         "padas": padas,
     }
