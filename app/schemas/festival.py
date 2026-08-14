@@ -1,8 +1,8 @@
 """Seasonal themes — Independence Day, Republic Day, Diwali, a sale week.
 
-The admin owns all of it: the dates it runs between, the colours it paints the
-app in, and what the banner says. Nothing about a festival is compiled into the
-app, so a new one is a panel entry rather than a release.
+A theme is a date range and a set of colours, nothing more: the app wears them
+and says nothing extra about it. The admin owns both, and nothing is compiled
+into the app, so a new one is a panel entry rather than a release.
 """
 
 from datetime import datetime
@@ -23,10 +23,6 @@ class FestivalBase(BaseModel):
     header_colors: List[str] = Field(default_factory=lambda: ["#4FC182", "#2E9E5B", "#186B3D"])
     accent: Optional[str] = None          # buttons and highlights during the run
 
-    banner_title: Optional[str] = None
-    banner_subtitle: Optional[str] = None
-    banner_image_url: Optional[str] = None
-    banner_emoji: Optional[str] = None
 
 
 class FestivalCreate(FestivalBase):
@@ -40,10 +36,6 @@ class FestivalUpdate(BaseModel):
     is_active: Optional[bool] = None
     header_colors: Optional[List[str]] = None
     accent: Optional[str] = None
-    banner_title: Optional[str] = None
-    banner_subtitle: Optional[str] = None
-    banner_image_url: Optional[str] = None
-    banner_emoji: Optional[str] = None
 
 
 class FestivalResponse(FestivalBase):
