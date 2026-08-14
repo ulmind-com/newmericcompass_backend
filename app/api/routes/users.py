@@ -11,10 +11,36 @@ from app.core.database import get_database
 from app.core.security import TokenData, create_access_token, get_current_user, get_password_hash, verify_password
 from app.schemas.common import now_utc, serialize_doc, serialize_docs
 from app.schemas.submission import SubmissionResponse
-from app.schemas.user import AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate, VerifyOTPRequest, ResendOTPRequest, ForgotPasswordRequest, ResetPasswordRequest
+from app.schemas.user import (
+    AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate, VerifyOTPRequest,
+    ResendOTPRequest, ForgotPasswordRequest, ResetPasswordRequest,
+    SignupStartRequest, SignupCompleteRequest,
+)
 
 import resend
 import random
+import jwt
+
+# Same secret/algorithm the rest of the auth stack uses.
+_SIGNUP_SECRET = settings.SECRET_KEY or "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+
+
+def _signup_token_for(email: str) -> str:
+    """Short-lived proof that this email's OTP was just verified."""
+    return create_access_token(
+        data={"sub": email, "scope": "signup"},
+        expires_delta=timedelta(minutes=20),
+    )
+
+
+def _email_from_signup_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, _SIGNUP_SECRET, algorithms=[settings.ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+    if payload.get("scope") != "signup":
+        return None
+    return (payload.get("sub") or "").lower().strip()
 
 if settings.RESEND_API_KEY:
     resend.api_key = settings.RESEND_API_KEY
@@ -82,8 +108,83 @@ async def register(payload: UserRegister, db: AsyncIOMotorDatabase = Depends(get
     }
     await db[USERS].insert_one(doc)
     await _generate_and_send_otp(db, email, payload.name.strip())
-    
+
     return {"message": "OTP sent. Please verify your email."}
+
+
+# --- Email-first signup (email → OTP → password → profile) ------------------
+
+@router.post("/signup/start", response_model=dict, status_code=201)
+async def signup_start(payload: SignupStartRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Step 1 — take just an email and send a verification OTP."""
+    email = payload.email.lower().strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=422, detail="Please enter a valid email.")
+
+    existing = await db[USERS].find_one({"email": email})
+    if existing and existing.get("status") == "active":
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    # Upsert a placeholder we can complete later; never clobber an in-progress one's history.
+    await db[USERS].update_one(
+        {"email": email},
+        {
+            "$set": {"email": email, "status": "pending", "email_verified": False},
+            "$setOnInsert": {
+                "name": "", "whatsapp": None, "phone": None,
+                "is_premium": False, "role": "user", "created_at": now_utc(),
+            },
+        },
+        upsert=True,
+    )
+    await _generate_and_send_otp(db, email, "")
+    return {"message": "A verification code has been sent to your email."}
+
+
+@router.post("/signup/verify-otp", response_model=dict)
+async def signup_verify_otp(payload: VerifyOTPRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Step 2 — check the OTP and hand back a short-lived signup token."""
+    email = payload.email.lower().strip()
+    otp_record = await db["otps"].find_one({"email": email, "otp": payload.otp})
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    if otp_record.get("expires_at", now_utc()) < now_utc():
+        raise HTTPException(status_code=400, detail="OTP has expired")
+
+    await db[USERS].update_one({"email": email}, {"$set": {"email_verified": True}})
+    await db["otps"].delete_one({"email": email})
+    return {"verified": True, "signup_token": _signup_token_for(email)}
+
+
+@router.post("/signup/complete", response_model=AuthResponse)
+async def signup_complete(payload: SignupCompleteRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Step 3 — set password + profile on a verified email and sign the user in."""
+    email = payload.email.lower().strip()
+    token_email = _email_from_signup_token(payload.signup_token)
+    if not token_email or token_email != email:
+        raise HTTPException(status_code=401, detail="Verification expired. Please verify your email again.")
+    if not payload.name.strip():
+        raise HTTPException(status_code=422, detail="Please enter your name.")
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=422, detail="Password must be at least 6 characters.")
+
+    user = await db[USERS].find_one({"email": email})
+    if not user or not user.get("email_verified"):
+        raise HTTPException(status_code=400, detail="Please verify your email first.")
+    if user.get("status") == "active":
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    user = await db[USERS].find_one_and_update(
+        {"email": email},
+        {"$set": {
+            "name": payload.name.strip(),
+            "whatsapp": (payload.whatsapp or "").strip() or None,
+            "hashed_password": get_password_hash(payload.password),
+            "status": "active",
+        }},
+        return_document=True,
+    )
+    return AuthResponse(access_token=_token_for(email), user=_profile(user))
 
 
 @router.post("/login", response_model=AuthResponse)
