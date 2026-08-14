@@ -43,6 +43,18 @@ class VerifyOTPRequest(BaseModel):
     email: str
     otp: str
 
+class SignupStartRequest(BaseModel):
+    """Step 1 of the email-first signup: just the email, to receive an OTP."""
+    email: str
+
+class SignupCompleteRequest(BaseModel):
+    """Final step: a signup_token (from a verified OTP) plus the new profile."""
+    email: str
+    name: str
+    password: str
+    whatsapp: Optional[str] = None
+    signup_token: str
+
 class ResendOTPRequest(BaseModel):
     email: str
 
