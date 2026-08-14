@@ -17,9 +17,21 @@ async def connect_to_mongo():
         # Verify connection
         await db.client.admin.command('ping')
         logger.info("Successfully connected to MongoDB Atlas!")
+        # Ensure indexes for production performance
+        await _ensure_indexes()
     except Exception as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
         raise e
+
+async def _ensure_indexes():
+    """Create indexes that are critical for production performance."""
+    try:
+        database = db.client[settings.DATABASE_NAME]
+        await database.push_tokens.create_index("token", unique=True)
+        await database.push_tokens.create_index("is_active")
+        logger.info("Database indexes ensured.")
+    except Exception as e:
+        logger.warning(f"Index creation warning (safe to ignore on re-runs): {e}")
 
 async def close_mongo_connection():
     logger.info("Closing MongoDB connection...")
