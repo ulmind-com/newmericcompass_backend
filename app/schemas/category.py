@@ -17,6 +17,7 @@ class CategoryBase(BaseModel):
     # ideal / to-avoid placement for this category. Drives the compass guidance.
     best_directions: List[str] = Field(default_factory=list)
     avoid_directions: List[str] = Field(default_factory=list)
+    category_group: Optional[str] = None  # 'architecture' or 'objects'
 
 
 class CategoryCreate(CategoryBase):
@@ -31,6 +32,7 @@ class CategoryUpdate(BaseModel):
     is_active: Optional[bool] = None
     best_directions: Optional[List[str]] = None
     avoid_directions: Optional[List[str]] = None
+    category_group: Optional[str] = None
 
 
 class CategoryResponse(CategoryBase):
