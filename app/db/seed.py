@@ -194,6 +194,49 @@ async def _seed_padas(db: AsyncIOMotorDatabase) -> None:
         await db.padas.update_one({"code": code}, {"$set": fields}, upsert=True)
 
 
+import json as _json
+import pathlib as _pathlib
+
+# Admin-authored 16-zone categories live in a data file so new ones are a JSON
+# edit + a SEED_VERSION bump, never a code change.
+_ZONE_DATA_FILE = _pathlib.Path(__file__).parent / "seed_data" / "zone_analysis.json"
+
+
+async def _seed_zone_analysis(db: AsyncIOMotorDatabase) -> None:
+    """Seed categories + their 16 direction rules from zone_analysis.json."""
+    try:
+        data = _json.loads(_ZONE_DATA_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return
+
+    rule_count = 0
+    for cat in data:
+        slug = cat["slug"]
+        zones = cat["zones"]
+        best = [d for d in DIRECTION_16 if zones.get(d, {}).get("verdict") == "excellent"]
+        avoid = [d for d in DIRECTION_16 if zones.get(d, {}).get("verdict") == "bad"]
+        await db.categories.update_one(
+            {"slug": slug},
+            {"$set": {"name": cat["name"], "icon_key": cat.get("icon_key"),
+                      "order": cat.get("order", 50), "is_active": True,
+                      "best_directions": best, "avoid_directions": avoid},
+             "$setOnInsert": {"slug": slug, "icon_url": None}},
+            upsert=True,
+        )
+        for dir16, z in zones.items():
+            verdict = z["verdict"]
+            await db.vastu_rules.update_one(
+                {"category_slug": slug, "pada_code": REP[dir16]},
+                {"$set": {"verdict": verdict, "score": _SCORE[verdict],
+                          "effects": z.get("effects", []), "treatments": z.get("treatments", []),
+                          "is_active": True},
+                 "$setOnInsert": {"category_slug": slug, "pada_code": REP[dir16], "notes": None}},
+                upsert=True,
+            )
+            rule_count += 1
+    logger.info("Seeded %d zone-analysis categories, %d rules.", len(data), rule_count)
+
+
 async def _seed_categories_and_rules(db: AsyncIOMotorDatabase) -> None:
     order = 0
     icon_by_slug = {slug: icon for slug, _, icon in CATEGORIES}
@@ -444,7 +487,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 14
+SEED_VERSION = 15
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
@@ -456,6 +499,7 @@ async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> Non
     if force or current < SEED_VERSION:
         await _seed_padas(db)
         await _seed_categories_and_rules(db)
+        await _seed_zone_analysis(db)
         await _seed_plans(db)
         await _seed_app_links(db)
         await _seed_day_protocols(db)

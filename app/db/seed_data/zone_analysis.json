@@ -1,0 +1,316 @@
+[
+  {
+    "slug": "borewell",
+    "name": "Borewell / Underground Water",
+    "icon_key": "water-tank",
+    "order": 40,
+    "zones": {
+      "N": {
+        "verdict": "excellent",
+        "effects": [
+          "Home: continuous career growth, new income streams and financial stability.",
+          "Business: faster client acquisition, smooth sales conversion and expansion.",
+          "Perfect placement — do not shift."
+        ],
+        "treatments": ["Keep the surrounding ground clean. Paint the tank cover blue or green."]
+      },
+      "NNE": {
+        "verdict": "excellent",
+        "effects": [
+          "Home: enhances physical immunity, mental longevity and overall vitality.",
+          "Business: excellent for hospitals, clinics, wellness centres and food industries.",
+          "Ideal location."
+        ],
+        "treatments": ["Paint the cover frame light blue or white."]
+      },
+      "NE": {
+        "verdict": "excellent",
+        "effects": [
+          "Ishan Kona — the most auspicious zone for underground water.",
+          "Home: deep mental peace, spiritual harmony, wise decisions and family prosperity.",
+          "Business: excellent for headquarters, strategy centres and consultancy firms."
+        ],
+        "treatments": ["Keep the water source immaculate. Paint the cover pure white."]
+      },
+      "ENE": {
+        "verdict": "good",
+        "effects": [
+          "Keeps the home atmosphere cheerful.",
+          "Business: boosts employee satisfaction and creative brainstorming.",
+          "Good zone — no relocation needed."
+        ],
+        "treatments": ["Use a light green or silver-grey top cover."]
+      },
+      "E": {
+        "verdict": "good",
+        "effects": [
+          "Home: expands social stature and connections with influential people.",
+          "Business: boosts public relations, government approvals and brand visibility.",
+          "Very good alignment."
+        ],
+        "treatments": ["Keep the surrounding area open. Use a green-marble or steel inspection cover."]
+      },
+      "ESE": {
+        "verdict": "average",
+        "effects": [
+          "Causes excessive mental churn, overthinking and family arguments.",
+          "Business: friction between partners and over-analysis of trivial matters.",
+          "Shift slightly towards East or NE."
+        ],
+        "treatments": ["Border the lid with a pastel-green strip (3–4 inches) or a green copper border."]
+      },
+      "SE": {
+        "verdict": "bad",
+        "effects": [
+          "Severe Vastu defect — water in the fire zone (Agni Kona).",
+          "Home: liquidity crashes, health issues for female members and accident hazards.",
+          "Business: blocked working capital, tax disputes and machinery breakdowns.",
+          "Mandatory relocation to North or East."
+        ],
+        "treatments": [
+          "Install a red/copper strip around the pit border.",
+          "Place a thick green-marble slab beneath the pump or over the lid — wood buffers water and fire."
+        ]
+      },
+      "SSE": {
+        "verdict": "bad",
+        "effects": [
+          "Dampens inner drive, physical stamina and operational vigour.",
+          "Business: weak execution power and passive management.",
+          "Shift to North or NE."
+        ],
+        "treatments": ["Border with a red paint/tape line, or embed a copper wire around the perimeter."]
+      },
+      "S": {
+        "verdict": "bad",
+        "effects": [
+          "Damages family reputation, disturbs deep sleep and invites legal notices.",
+          "Business: brand erosion.",
+          "Shift to North, NNE or NE."
+        ],
+        "treatments": ["Border the perimeter with a red/brown tile or a copper strip."]
+      },
+      "SSW": {
+        "verdict": "bad",
+        "effects": [
+          "Critical defect — clean water stored in the zone of disposal drains health, wealth and energy.",
+          "Water tends to get contaminated or leak frequently.",
+          "Relocate to North or East."
+        ],
+        "treatments": ["Encircle the lid with a 4-inch brass strip embedded in the floor."]
+      },
+      "SW": {
+        "verdict": "bad",
+        "effects": [
+          "Critical defect — a pit in the heaviest earth zone (Pitru Kona).",
+          "Home: structural instability, relationship breakdown, health issues for the head of the family and financial failure.",
+          "Business: high turnover of key staff, owner depression and collapse.",
+          "Mandatory relocation."
+        ],
+        "treatments": [
+          "Embed a 4-inch brass strip around the pit.",
+          "Paint the lid yellow and place heavy yellow-granite stones around the perimeter to restore weight balance."
+        ]
+      },
+      "WSW": {
+        "verdict": "bad",
+        "effects": [
+          "Drains long-term savings, fixed deposits and children's education gains.",
+          "Shift to West or North."
+        ],
+        "treatments": ["Encircle the border with a yellow/brass strip."]
+      },
+      "W": {
+        "verdict": "good",
+        "effects": [
+          "Varun Kona — ruled by the water god.",
+          "Home: stable financial gains and asset growth.",
+          "Business: steady profit margins and reliable trade yields.",
+          "Acceptable zone — relocation optional."
+        ],
+        "treatments": ["Use a white, grey or metallic cover."]
+      },
+      "WNW": {
+        "verdict": "average",
+        "effects": [
+          "May trigger low moods or emotional detachment if water stays stagnant.",
+          "Business: low staff morale.",
+          "Shift to West or NW."
+        ],
+        "treatments": ["Frame the perimeter with a stainless-steel strip or a white paint line."]
+      },
+      "NW": {
+        "verdict": "good",
+        "effects": [
+          "Home: support from relatives, friends and social circle.",
+          "Business: smooth banking credit, loan sanctions, investor backing and trading liquidity.",
+          "Good zone."
+        ],
+        "treatments": ["Use a white or metallic-grey top lid."]
+      },
+      "NNW": {
+        "verdict": "good",
+        "effects": [
+          "Boosts marital harmony, charm and personal magnetism.",
+          "Business: strong customer attraction.",
+          "Favourable placement."
+        ],
+        "treatments": ["Keep the area tidy. Paint the lid light blue."]
+      }
+    }
+  },
+  {
+    "slug": "septic-tank",
+    "name": "Septic Tank",
+    "icon_key": "toilet",
+    "order": 41,
+    "zones": {
+      "N": {
+        "verdict": "bad",
+        "effects": [
+          "Flushes away new business leads and creates sudden blocks in cash inflow.",
+          "Causes career stagnation.",
+          "Shift to WNW, SSW or NW."
+        ],
+        "treatments": ["Border the lid with a blue paint/tape strip, or embed a steel strip in the ground around it."]
+      },
+      "NNE": {
+        "verdict": "bad",
+        "effects": [
+          "Severe drop in physical immunity, chronic illness and slow healing.",
+          "Continuous medical expenses.",
+          "Shift to a dedicated disposal zone."
+        ],
+        "treatments": ["Paint the cover frame light green and place a green-marble border around the boundary."]
+      },
+      "NE": {
+        "verdict": "bad",
+        "effects": [
+          "Critical Vastu dosh — NE (Ishan Kona) is the head of the Vastu Purusha.",
+          "Neurological issues, severe depression, blocked vision and bankruptcy.",
+          "Mandatory relocation."
+        ],
+        "treatments": [
+          "Install a brass/copper grid around the tank area and paint the lid white.",
+          "Keep the top covered with green potted plants (in lightweight pots) to absorb toxic energy."
+        ]
+      },
+      "ENE": {
+        "verdict": "average",
+        "effects": [
+          "Flushes out peace of mind and personal joy.",
+          "Residents feel perpetually exhausted and hopeless.",
+          "Shift towards ESE or WNW."
+        ],
+        "treatments": ["Frame with a green paint/tape line, or plant a row of green foliage around it."]
+      },
+      "E": {
+        "verdict": "bad",
+        "effects": [
+          "Governed by Surya — waste here causes loss of social respect.",
+          "Political/legal problems and damaged relationships with society.",
+          "Shift to ESE."
+        ],
+        "treatments": ["Surround the area with a copper or stainless-steel strip embedded in the ground."]
+      },
+      "ESE": {
+        "verdict": "excellent",
+        "effects": [
+          "Ideal — ESE is the zone of churning.",
+          "Effectively neutralises overthinking, anxiety and obsessive churn of thoughts.",
+          "No relocation needed."
+        ],
+        "treatments": ["Paint the top border pastel green or cream."]
+      },
+      "SE": {
+        "verdict": "bad",
+        "effects": [
+          "Severe defect — liquid waste in Agni Kona (fire) extinguishes liquidity.",
+          "Unexpected financial losses, digestive/blood issues for women and delayed marriages.",
+          "Relocate immediately."
+        ],
+        "treatments": [
+          "Encircle the tank with a red or copper strip.",
+          "Keep a thick green-marble slab laid over the top slab area."
+        ]
+      },
+      "SSE": {
+        "verdict": "average",
+        "effects": [
+          "Erodes physical drive, self-confidence and operational strength.",
+          "Shift to SSW or WNW."
+        ],
+        "treatments": ["Apply a red/brown strip around the boundary, or insert a copper wire underground around it."]
+      },
+      "S": {
+        "verdict": "average",
+        "effects": [
+          "Destroys peace of mind and damages brand reputation.",
+          "Causes insomnia or disturbed sleep.",
+          "Shift towards SSW."
+        ],
+        "treatments": ["Border the perimeter with a red paint line or a copper strip."]
+      },
+      "SSW": {
+        "verdict": "excellent",
+        "effects": [
+          "Ideal placement — SSW naturally governs disposal and elimination.",
+          "Flushes out negative energies, unwanted expenses and emotional clutter seamlessly.",
+          "No relocation required."
+        ],
+        "treatments": ["Keep the boundary clean. Use a yellow/brass strip around the border if any minor leakage occurs."]
+      },
+      "SW": {
+        "verdict": "bad",
+        "effects": [
+          "Critical Vastu dosh — SW represents earth stability, skill and family bonds.",
+          "Structural instability, relationship ruptures, skill dilution and ancestral dosha.",
+          "Mandatory relocation."
+        ],
+        "treatments": ["Embed a 4-inch brass strip entirely around the tank. Paint the cover yellow to strengthen the earth element."]
+      },
+      "WSW": {
+        "verdict": "bad",
+        "effects": [
+          "Literally flushes away cash savings, education and long-term investments.",
+          "Shift slightly towards SSW or WNW."
+        ],
+        "treatments": ["Frame the outer border with a brass/yellow strip to seal off the savings-draining frequency."]
+      },
+      "W": {
+        "verdict": "average",
+        "effects": [
+          "Though West is ruled by Varuna, a septic tank in pure West flushes out profit margins, deals and returns.",
+          "Shift towards WNW."
+        ],
+        "treatments": ["Paint the cover grey/white, or place a steel strip around the pit area."]
+      },
+      "WNW": {
+        "verdict": "excellent",
+        "effects": [
+          "Ideal placement (Rodan Kona) — the zone of emotional release.",
+          "Flushes out mental grief, unresolved trauma and emotional weight, keeping residents refreshed.",
+          "No relocation needed."
+        ],
+        "treatments": ["Keep the area well-sealed and painted white or stainless-steel grey."]
+      },
+      "NW": {
+        "verdict": "good",
+        "effects": [
+          "Ruled by Vayu (air) — assists the smooth dispersal of gaseous waste.",
+          "Works very effectively when kept towards WNW.",
+          "Good placement."
+        ],
+        "treatments": ["Paint the lid off-white/silver."]
+      },
+      "NNW": {
+        "verdict": "bad",
+        "effects": [
+          "Flushes away charm, physical attraction and harmony in marital life.",
+          "Shift to WNW or NW."
+        ],
+        "treatments": ["Encircle the tank with a light-blue/white strip to stabilise the attraction field."]
+      }
+    }
+  }
+]
