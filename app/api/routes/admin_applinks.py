@@ -24,10 +24,34 @@ SHARE_ID = "share"
 
 # A bot user-agent: sites (Facebook especially) serve the same Open Graph card
 # they give link-preview crawlers like WhatsApp, rather than a login wall.
-_PREVIEW_UA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+# Facebook serves its Open Graph card to link crawlers but a login wall to a
+# plain browser — yet for some reels the crawler page omits og:image while the
+# browser page keeps the thumbnail in its markup. So we try both and take the
+# best of the two, plus a couple of non-OG fallbacks.
+_CRAWLER_UA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+)
 _META_TAG = re.compile(r"<meta\b[^>]*>", re.I)
 _ATTR = re.compile(r'([\w:-]+)\s*=\s*"([^"]*)"|' r"([\w:-]+)\s*=\s*'([^']*)'")
 _TITLE_TAG = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+_IMAGE_SRC = re.compile(r'<link[^>]+rel=["\']image_src["\'][^>]+href=["\']([^"\']+)', re.I)
+# Last resort: a real *content* thumbnail in the page. Deliberately excludes
+# Facebook's chrome CDN (static.*/rsrc.php — logos and icons), which a looser
+# pattern would otherwise grab off a login wall.
+_CDN_IMAGE = re.compile(
+    r'https?://[^"\'\\ )]*?(?:scontent[\w.-]*\.fbcdn\.net|ytimg\.com|cdninstagram\.com)'
+    r'[^"\'\\ )]+?\.(?:jpg|jpeg|png|webp)',
+    re.I,
+)
+_IMG_KEYS = {"og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src"}
+# Facebook sometimes answers a crawler with its login page instead of the reel.
+_LOGIN_WALL = re.compile(r"\blog in\b|\bsign up\b|log into facebook|you must log in", re.I)
+
+
+def _looks_walled(title: str | None) -> bool:
+    return bool(title and _LOGIN_WALL.search(title))
 
 
 def _oid(value: str) -> ObjectId:
@@ -64,20 +88,63 @@ def _meta(html_text: str, keys: set[str]) -> str | None:
     return None
 
 
+def _find_image(text: str) -> str | None:
+    """og:image and friends, then <link rel=image_src>, then any CDN image URL."""
+    img = _meta(text, _IMG_KEYS)
+    if img:
+        return img
+    m = _IMAGE_SRC.search(text)
+    if m:
+        return _html.unescape(m.group(1))
+    m = _CDN_IMAGE.search(text)
+    return _html.unescape(m.group(0)) if m else None
+
+
 async def _scrape_og(url: str) -> dict:
+    """Read title + image robustly.
+
+    Facebook flip-flops between the real Open Graph card and a login wall, so we
+    try a few times across two user-agents, ignore anything that came back as a
+    login page, and keep the best real values we saw.
+    """
+    out = {"title": None, "image": None, "description": None, "site_name": None}
+    # crawler, browser, then crawler again — cheap retries beat FB's flakiness.
+    attempts = (_CRAWLER_UA, _BROWSER_UA, _CRAWLER_UA)
+
     async with httpx.AsyncClient(follow_redirects=True, timeout=12.0) as client:
-        res = await client.get(url, headers={"User-Agent": _PREVIEW_UA, "Accept-Language": "en"})
-        text = res.text
-    title = _meta(text, {"og:title", "twitter:title"})
-    if not title:
-        m = _TITLE_TAG.search(text)
-        title = _html.unescape(m.group(1)).strip() if m else None
-    return {
-        "title": title,
-        "image": _meta(text, {"og:image", "og:image:url", "twitter:image", "twitter:image:src"}),
-        "description": _meta(text, {"og:description", "twitter:description", "description"}),
-        "site_name": _meta(text, {"og:site_name"}),
-    }
+        for ua in attempts:
+            try:
+                res = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": ua,
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Accept": "text/html,application/xhtml+xml",
+                    },
+                )
+                text = res.text
+            except Exception:
+                continue
+
+            title = _meta(text, {"og:title", "twitter:title"})
+            if not title:
+                m = _TITLE_TAG.search(text)
+                title = _html.unescape(m.group(1)).strip() if m else None
+            if _looks_walled(title):
+                continue  # a login page — try again, don't keep its title/image
+
+            if not out["title"]:
+                out["title"] = title
+            if not out["image"]:
+                out["image"] = _find_image(text)
+            if not out["description"]:
+                out["description"] = _meta(text, {"og:description", "twitter:description", "description"})
+            if not out["site_name"]:
+                out["site_name"] = _meta(text, {"og:site_name"})
+
+            if out["title"] and out["image"]:
+                break  # got everything we need
+    return out
 
 
 @router.post("/link-preview", response_model=LinkPreviewResponse, summary="Fetch a link's rich preview")
