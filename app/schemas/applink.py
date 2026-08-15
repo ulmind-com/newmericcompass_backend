@@ -58,6 +58,20 @@ class AppLinkResponse(AppLinkBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LinkPreviewRequest(BaseModel):
+    """A pasted URL the admin wants a rich preview for."""
+    url: str
+
+
+class LinkPreviewResponse(BaseModel):
+    """What we could scrape from the link — used to pre-fill the add-link form."""
+    platform: Platform
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    site_name: Optional[str] = None
+
+
 class ShareSettings(BaseModel):
     """Sharing the app, and when to ask for a review.
 
