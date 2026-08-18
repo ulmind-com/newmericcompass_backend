@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # --- Categories: (slug, name, icon_key) ---
 CATEGORIES = [
-    ("main-entrance", "Main Entrance", "door"),
+    ("main-entrance", "Home", "home"),
     ("bedroom", "Bedroom", "bed"),
     ("kitchen", "Kitchen", "kitchen"),
     ("toilet", "Toilet", "toilet"),
@@ -448,7 +448,7 @@ async def _seed_demo(db: AsyncIOMotorDatabase) -> None:
         await db.submissions.insert_many([
             {"device_id": None, "title": "3BHK Flat — Kolkata", "name": "Aarav Sharma",
              "whatsapp": "+91 98000 00001", "email": "aarav@example.com",
-             "items": [{"category_slug": "main-entrance", "category_name": "Main Entrance", "degree": 46.0, "pada_code": "E1", "direction16": "NE", "verdict": "excellent"},
+             "items": [{"category_slug": "main-entrance", "category_name": "Home", "degree": 46.0, "pada_code": "E1", "direction16": "NE", "verdict": "excellent"},
                        {"category_slug": "kitchen", "category_name": "Kitchen", "degree": 135.0, "pada_code": "S1", "direction16": "SE", "verdict": "excellent"},
                        {"category_slug": "toilet", "category_name": "Toilet", "degree": 4.0, "pada_code": "N5", "direction16": "N", "verdict": "bad"}],
              "created_at": now - timedelta(days=1)},
@@ -487,7 +487,7 @@ async def _seed_admin_from_env(db: AsyncIOMotorDatabase) -> None:
 
 # Bump this whenever the seed content changes so already-populated deployments
 # pick up the new data automatically on their next startup.
-SEED_VERSION = 15
+SEED_VERSION = 16
 
 
 async def ensure_seed_data(db: AsyncIOMotorDatabase, force: bool = False) -> None:
