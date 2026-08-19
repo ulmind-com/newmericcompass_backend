@@ -13,8 +13,9 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
 from app.core.database import get_database
+from app.core.security import TokenData, get_current_admin
 from app.schemas.common import now_utc
-from app.services.push_service import TOKENS
+from app.services.push_service import TOKENS, reap_receipts
 
 router = APIRouter()
 
@@ -49,3 +50,26 @@ async def register(payload: PushRegister, db: AsyncIOMotorDatabase = Depends(get
 @router.post("/unregister", status_code=204, summary="Stop notifying this device")
 async def unregister(payload: PushRegister, db: AsyncIOMotorDatabase = Depends(get_database)):
     await db[TOKENS].delete_one({"token": payload.token.strip()})
+
+
+@router.get("/devices", summary="How many devices are actually reachable")
+async def devices(db: AsyncIOMotorDatabase = Depends(get_database), _: TokenData = Depends(get_current_admin)):
+    """What the token table looks like, so "10 failed" can be explained rather
+    than guessed at."""
+    rows = await db[TOKENS].find({"is_active": True}).to_list(length=100_000)
+    by_platform: dict[str, int] = {}
+    for r in rows:
+        key = r.get("platform") or "unknown"
+        by_platform[key] = by_platform.get(key, 0) + 1
+    return {
+        "devices": len(rows),
+        "by_platform": by_platform,
+        "signed_in": sum(1 for r in rows if r.get("email")),
+    }
+
+
+@router.post("/reap", summary="Read pending receipts and drop dead devices")
+async def reap(db: AsyncIOMotorDatabase = Depends(get_database), _: TokenData = Depends(get_current_admin)):
+    """Normally runs before every send; exposed so a stale table can be cleaned
+    without having to notify anybody."""
+    return await reap_receipts(db)
