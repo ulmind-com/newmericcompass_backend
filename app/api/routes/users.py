@@ -17,9 +17,10 @@ from app.schemas.user import (
     SignupStartRequest, SignupCompleteRequest,
 )
 
-import resend
 import random
 import jwt
+
+from app.services.email_service import send_otp_email
 
 # Same secret/algorithm the rest of the auth stack uses.
 _SIGNUP_SECRET = settings.SECRET_KEY or "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -42,11 +43,9 @@ def _email_from_signup_token(token: str) -> str | None:
         return None
     return (payload.get("sub") or "").lower().strip()
 
-if settings.RESEND_API_KEY:
-    resend.api_key = settings.RESEND_API_KEY
-
 router = APIRouter()
 USERS = "users"
+OTP_TTL_MINUTES = 10
 
 
 def _token_for(email: str) -> str:
@@ -55,9 +54,10 @@ def _token_for(email: str) -> str:
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
-async def _generate_and_send_otp(db: AsyncIOMotorDatabase, email: str, name: str):
+async def _generate_and_send_otp(db: AsyncIOMotorDatabase, email: str, name: str, purpose: str = "verify"):
+    """Store a fresh OTP and mail it out. `purpose` picks the template copy."""
     otp = str(random.randint(100000, 999999))
-    expires_at = now_utc() + timedelta(minutes=10)
+    expires_at = now_utc() + timedelta(minutes=OTP_TTL_MINUTES)
     
     await db["otps"].update_one(
         {"email": email},
@@ -65,16 +65,7 @@ async def _generate_and_send_otp(db: AsyncIOMotorDatabase, email: str, name: str
         upsert=True
     )
     
-    if settings.RESEND_API_KEY and settings.MAIL_ADDRESS:
-        try:
-            resend.Emails.send({
-                "from": f"Newmeric Compass <{settings.MAIL_ADDRESS}>",
-                "to": email,
-                "subject": "Your Verification Code",
-                "html": f"<p>Hello {name},</p><p>Your verification code is: <strong>{otp}</strong></p><p>This code will expire in 10 minutes.</p>"
-            })
-        except Exception as e:
-            print(f"Failed to send email: {e}")
+    send_otp_email(to=email, otp=otp, name=name, purpose=purpose, minutes=OTP_TTL_MINUTES)
 
 
 def _profile(doc: dict) -> UserProfile:
@@ -245,7 +236,7 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncIOMotorDataba
     # We return a generic success message to prevent email enumeration,
     # but we only actually send the email if the user exists and is active.
     if user and user.get("status") != "blocked":
-        await _generate_and_send_otp(db, email, user.get("name", ""))
+        await _generate_and_send_otp(db, email, user.get("name", ""), purpose="reset")
         
     return {"message": "If an account with that email exists, a password reset code has been sent."}
 
