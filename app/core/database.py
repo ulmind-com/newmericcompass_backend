@@ -13,7 +13,9 @@ db = Database()
 async def connect_to_mongo():
     logger.info("Connecting to MongoDB...")
     try:
-        db.client = AsyncIOMotorClient(settings.MONGODB_URL)
+        # tz_aware: Mongo stores UTC but the driver returns naive datetimes by
+        # default, which blow up any comparison against an aware `now_utc()`.
+        db.client = AsyncIOMotorClient(settings.MONGODB_URL, tz_aware=True)
         # Verify connection
         await db.client.admin.command('ping')
         logger.info("Successfully connected to MongoDB Atlas!")

@@ -9,7 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.config import settings
 from app.core.database import get_database
 from app.core.security import TokenData, create_access_token, get_current_user, get_password_hash, verify_password
-from app.schemas.common import now_utc, serialize_doc, serialize_docs
+from app.schemas.common import as_utc, now_utc, serialize_doc, serialize_docs
 from app.schemas.submission import SubmissionResponse
 from app.schemas.user import (
     AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate, VerifyOTPRequest,
@@ -66,6 +66,16 @@ async def _generate_and_send_otp(db: AsyncIOMotorDatabase, email: str, name: str
     )
     
     send_otp_email(to=email, otp=otp, name=name, purpose=purpose, minutes=OTP_TTL_MINUTES)
+
+
+async def _consume_otp(db: AsyncIOMotorDatabase, email: str, otp: str) -> None:
+    """Validate an OTP or raise. Callers delete it once the action succeeds."""
+    record = await db["otps"].find_one({"email": email, "otp": otp})
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    expires_at = as_utc(record.get("expires_at"))
+    if expires_at and expires_at < now_utc():
+        raise HTTPException(status_code=400, detail="OTP has expired")
 
 
 def _profile(doc: dict) -> UserProfile:
@@ -136,11 +146,7 @@ async def signup_start(payload: SignupStartRequest, db: AsyncIOMotorDatabase = D
 async def signup_verify_otp(payload: VerifyOTPRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Step 2 — check the OTP and hand back a short-lived signup token."""
     email = payload.email.lower().strip()
-    otp_record = await db["otps"].find_one({"email": email, "otp": payload.otp})
-    if not otp_record:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    if otp_record.get("expires_at", now_utc()) < now_utc():
-        raise HTTPException(status_code=400, detail="OTP has expired")
+    await _consume_otp(db, email, payload.otp)
 
     await db[USERS].update_one({"email": email}, {"$set": {"email_verified": True}})
     await db["otps"].delete_one({"email": email})
@@ -193,14 +199,8 @@ async def login(payload: UserLogin, db: AsyncIOMotorDatabase = Depends(get_datab
 @router.post("/verify-otp", response_model=AuthResponse)
 async def verify_otp(payload: VerifyOTPRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
     email = payload.email.lower().strip()
-    otp_record = await db["otps"].find_one({"email": email, "otp": payload.otp})
-    
-    if not otp_record:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-        
-    if otp_record.get("expires_at", now_utc()) < now_utc():
-        raise HTTPException(status_code=400, detail="OTP has expired")
-        
+    await _consume_otp(db, email, payload.otp)
+
     user = await db[USERS].find_one_and_update(
         {"email": email},
         {"$set": {"status": "active"}},
@@ -243,14 +243,8 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncIOMotorDataba
 @router.post("/reset-password", response_model=dict)
 async def reset_password(payload: ResetPasswordRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
     email = payload.email.lower().strip()
-    otp_record = await db["otps"].find_one({"email": email, "otp": payload.otp})
-    
-    if not otp_record:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-        
-    if otp_record.get("expires_at", now_utc()) < now_utc():
-        raise HTTPException(status_code=400, detail="OTP has expired")
-        
+    await _consume_otp(db, email, payload.otp)
+
     user = await db[USERS].find_one({"email": email})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

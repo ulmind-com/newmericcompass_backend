@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from typing import List
 import asyncio
-from datetime import datetime
+
+from app.schemas.common import now_utc
 
 from app.core.security import get_current_active_admin, TokenData
 from app.core.database import get_database
@@ -55,7 +56,7 @@ async def get_all_users(
             id=str(u.get("_id", "")),
             email=u.get("email", "unknown@example.com"),
             name=u.get("name", "Unknown User"),
-            created_at=u.get("created_at", datetime.utcnow()),
+            created_at=u.get("created_at", now_utc()),
             is_premium=u.get("is_premium", False),
             status=u.get("status", "active")
         ))

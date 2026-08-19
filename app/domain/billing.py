@@ -11,6 +11,7 @@ from typing import Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.schemas.billing import Feature, FeatureAccess
+from app.schemas.common import as_utc
 
 PLANS = "plans"
 ENTITLEMENTS = "entitlements"
@@ -26,9 +27,7 @@ def _now() -> datetime:
 
 def _aware(dt: Optional[datetime]) -> Optional[datetime]:
     """Mongo hands back naive datetimes; treat them as the UTC they were stored as."""
-    if dt is None:
-        return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return as_utc(dt)
 
 
 def normalize_email(email: Optional[str]) -> str:
