@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Resend Email Verification
     RESEND_API_KEY: Optional[str] = None
     MAIL_ADDRESS: Optional[str] = None
+    # Logo shown in transactional emails. Defaults to the copy this API serves
+    # at /static/email/logo.png; set this to a CDN URL to override.
+    EMAIL_LOGO_URL: Optional[str] = None
     
     # Acharya the app offers to call for a treatment consultation.
     ACHARYA_NAME: str = "N5 Acharya"
