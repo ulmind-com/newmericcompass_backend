@@ -37,7 +37,9 @@ router = APIRouter()
 async def list_plans(feature: Optional[str] = None, db: AsyncIOMotorDatabase = Depends(get_database)):
     query: dict = {"is_active": True}
     if feature:
-        query["feature"] = feature
+        # A bundle is filed under one feature but opens several, so asking for
+        # a screen must also find the bundles that include it.
+        query["$or"] = [{"feature": feature}, {"features": feature}]
     cursor = db[bl.PLANS].find(query).sort([("feature", 1), ("order", 1), ("amount", 1)])
     return serialize_docs(await cursor.to_list(length=100))
 
@@ -101,6 +103,9 @@ async def create_order(
             "plan_slug": plan["slug"],
             "plan_name": plan["name"],
             "feature": plan["feature"],
+            # What the order actually opens, resolved at purchase time so a later
+            # edit to the plan cannot change what this buyer paid for.
+            "features": bl.plan_features(plan),
             "kind": plan["kind"],
             "amount": plan["amount"],
             "currency": plan.get("currency", "INR"),
@@ -158,6 +163,7 @@ async def verify_payment(
         "plan_slug": order["plan_slug"],
         "plan_name": order["plan_name"],
         "feature": order["feature"],
+        "features": order.get("features") or [order["feature"]],
         "kind": order["kind"],
         "amount": order["amount"],
         "currency": order.get("currency", "INR"),
@@ -171,17 +177,21 @@ async def verify_payment(
     }
     result = await db[bl.PAYMENTS].insert_one(doc)
 
-    await bl.grant(
-        db,
-        email=email,
-        feature=order["feature"],
-        source="payment",
-        plan_slug=order["plan_slug"],
-        plan_name=order["plan_name"],
-        duration_days=order.get("duration_days"),
-        submission_quota=order.get("submission_quota"),
-        payment_id=str(result.inserted_id),
-    )
+    # A bundle opens several screens on one payment; each gets its own
+    # entitlement row, so expiry and quota stay per-feature as before.
+    for feature in (order.get("features") or [order["feature"]]):
+        await bl.grant(
+            db,
+            email=email,
+            feature=feature,
+            source="payment",
+            plan_slug=order["plan_slug"],
+            plan_name=order["plan_name"],
+            duration_days=order.get("duration_days"),
+            # Only the metered feature carries a quota; the unlocks do not.
+            submission_quota=order.get("submission_quota") if feature == "submissions" else None,
+            payment_id=str(result.inserted_id),
+        )
     await db[bl.PAYMENT_ORDERS].update_one(
         {"razorpay_order_id": payload.razorpay_order_id},
         {"$set": {"status": "paid", "paid_at": now_utc()}},
