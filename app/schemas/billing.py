@@ -1,13 +1,16 @@
 """Plans, entitlements and payments.
 
-Three things the app charges for, each identified by a *feature* key:
-  submissions - a subscription; how many placement reports it allows and for
-                how long is entirely up to the plan
-  analysis    - one-time unlock of the Analysis screen
-  nexus       - one-time unlock of the 7D Nexus screen
+What the app charges for, each identified by a *feature* key:
+  submissions    - a subscription; how many placement reports it allows and for
+                   how long is entirely up to the plan
+  analysis       - unlock of the 16 Zone Analysis screen
+  nexus          - unlock of the 7D Nexus screen
+  vastu_analysis - unlock of Integrated Vastu Space & Environment Analysis
 
-Nothing about pricing, duration or quota is hardcoded: the admin creates and
-edits plans, and can also grant any feature to a user for free.
+A plan grants whichever of these its `features` list names, so one price can
+open several screens — a bundle — and the admin decides which. Nothing about
+pricing, duration, quota or what a plan includes is hardcoded: the admin
+creates and edits plans, and can also grant any feature to a user for free.
 """
 
 from datetime import datetime
@@ -21,6 +24,7 @@ class Feature(StrEnum):
     SUBMISSIONS = "submissions"
     ANALYSIS = "analysis"
     NEXUS = "nexus"
+    VASTU_ANALYSIS = "vastu_analysis"
 
 
 class PlanKind(StrEnum):
@@ -30,7 +34,12 @@ class PlanKind(StrEnum):
 
 class PlanBase(BaseModel):
     slug: str
+    # The feature the plan is filed under in the admin's list. Plans written
+    # before bundles existed carry only this, so it stays the fallback.
     feature: Feature
+    # Everything the plan opens. Empty means "just `feature`", which is what
+    # every plan created before bundles means.
+    features: List[Feature] = Field(default_factory=list)
     kind: PlanKind
     name: str
     description: Optional[str] = None
@@ -52,6 +61,7 @@ class PlanCreate(PlanBase):
 
 class PlanUpdate(BaseModel):
     feature: Optional[Feature] = None
+    features: Optional[List[Feature]] = None
     kind: Optional[PlanKind] = None
     name: Optional[str] = None
     description: Optional[str] = None

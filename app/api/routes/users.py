@@ -292,3 +292,33 @@ async def update_me(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return _profile(user)
+
+
+@router.delete("/me", response_model=dict)
+async def delete_me(
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Erase the signed-in user's account and everything attached to it.
+
+    Google Play requires an in-app route to this for any app that lets people
+    create an account. What goes: the profile, their submissions and photos'
+    references, entitlements, push tokens and any pending OTP. What stays: the
+    payment rows — the privacy policy says the fact and amount of a payment is
+    kept for the period tax law requires — with the email scrubbed off them so
+    they no longer point at a person.
+    """
+    email = (current.email or "").lower().strip()
+    user = await db[USERS].find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await db.submissions.delete_many({"user_email": email})
+    await db["entitlements"].delete_many({"user_email": email})
+    await db["push_tokens"].delete_many({"email": email})
+    await db["otps"].delete_many({"email": email})
+    # Keep the record, drop the person it points at.
+    await db["payments"].update_many({"user_email": email}, {"$set": {"user_email": None, "deleted_user": True}})
+    await db[USERS].delete_one({"email": email})
+
+    return {"deleted": True}

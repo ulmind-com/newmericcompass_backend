@@ -18,7 +18,19 @@ ENTITLEMENTS = "entitlements"
 PAYMENTS = "payments"
 PAYMENT_ORDERS = "payment_orders"
 
-ALL_FEATURES = [Feature.SUBMISSIONS, Feature.ANALYSIS, Feature.NEXUS]
+ALL_FEATURES = [Feature.SUBMISSIONS, Feature.ANALYSIS, Feature.NEXUS, Feature.VASTU_ANALYSIS]
+
+
+def plan_features(plan: dict[str, Any]) -> list[str]:
+    """Everything a plan opens.
+
+    A bundle names them in `features`. Plans written before bundles existed
+    have only `feature`, so that is the fallback — no migration needed, and an
+    admin who empties the list gets the single feature back rather than a plan
+    that grants nothing.
+    """
+    listed = [f for f in (plan.get("features") or []) if f]
+    return listed or ([plan["feature"]] if plan.get("feature") else [])
 
 
 def _now() -> datetime:
