@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     # Where this API is reachable from a phone - used to build the checkout URL.
     PUBLIC_BASE_URL: str = "https://newmericcompass-backend.onrender.com"
 
+    # The assistant. Two providers: Gemini embeds the corpus and the question,
+    # Groq writes the answer. Without either key the assistant reports itself
+    # as unconfigured rather than failing a request at a time.
+    GEMINI_API_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    # Questions one person may ask in a day. The assistant is free, so this is
+    # what stands between it and a bill.
+    AI_DAILY_LIMIT: int = 20
+
     # Environment variables are loaded from the .env file in development
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

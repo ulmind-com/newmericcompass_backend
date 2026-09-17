@@ -12,6 +12,7 @@ from app.api.routes import (
     admin_submissions,
     admin_tips,
     admin_uploads,
+    ai,
     auth,
     billing,
     public,
@@ -31,6 +32,7 @@ api_router.include_router(submissions.router, prefix="/submissions", tags=["Subm
 api_router.include_router(uploads.router, prefix="/uploads", tags=["Uploads"])
 api_router.include_router(push.router, prefix="/push", tags=["Push"])
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
+api_router.include_router(ai.router, prefix="/ai", tags=["Assistant"])
 
 # ---- Auth ----
 api_router.include_router(auth.router, prefix="/auth", tags=["Admin Auth"])
