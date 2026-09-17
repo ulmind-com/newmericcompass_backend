@@ -31,6 +31,10 @@ async def _ensure_indexes():
         database = db.client[settings.DATABASE_NAME]
         await database.push_tokens.create_index("token", unique=True)
         await database.push_tokens.create_index("is_active")
+        # The assistant's daily counters are only interesting on the day they
+        # are written; Mongo drops them itself rather than the collection
+        # growing one document per person per day forever.
+        await database.ai_usage.create_index("expires_at", expireAfterSeconds=0)
         logger.info("Database indexes ensured.")
     except Exception as e:
         logger.warning(f"Index creation warning (safe to ignore on re-runs): {e}")
