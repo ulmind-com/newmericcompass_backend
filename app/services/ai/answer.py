@@ -36,14 +36,23 @@ GROQ_URL = f"{GROQ_BASE}/chat/completions"
 #: hardcoded one turned every question into a 500. The list is filtered against
 #: what the account can actually see.
 PREFERRED_MODELS = (
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+    "groq/compound",
     "llama-3.3-70b-versatile",
     "llama-3.1-70b-versatile",
+    "groq/compound-mini",
     "llama-3.1-8b-instant",
-    "llama3-70b-8192",
 )
 
 #: Never pick one of these for writing an answer, whatever the account lists.
-NOT_FOR_CHAT = ("whisper", "tts", "guard", "embed", "vision", "distil")
+#: Groq's list mixes speech and safety models in with the chat ones, and
+#: "orpheus" is a voice model that will happily be chosen by position.
+NOT_FOR_CHAT = (
+    "whisper", "tts", "guard", "safeguard", "embed", "vision", "distil",
+    "orpheus", "canopylabs", "moderation",
+)
 
 _model: str | None = None
 _model_lock = asyncio.Lock()
@@ -193,7 +202,26 @@ def _context(hits: list[Hit]) -> str:
     )
 
 
-_CITE = re.compile(r"\[(\d+)\]")
+#: The citation forms models actually emit.
+#:
+#: The prompt asks for [3]. gpt-oss and compound answer with 【3】 — full-width
+#: lenticular brackets — and one of them grouped numbers as [1, 4]. A regex for
+#: [3] alone matched none of it, so a correct, fully grounded answer was thrown
+#: away by the citation check for using the wrong brackets. Read them all, and
+#: rewrite them to one form before the answer is shown.
+_CITE = re.compile(r"[\[【]\s*(\d+(?:\s*[,;]\s*\d+)*)\s*[\]】]")
+
+
+def _citations(text: str) -> tuple[str, set[int]]:
+    """Normalise every citation to [n], and report the numbers used."""
+    found: set[int] = set()
+
+    def rewrite(match: re.Match[str]) -> str:
+        numbers = [int(n) for n in re.split(r"[,;]", match.group(1))]
+        found.update(numbers)
+        return "".join(f"[{n}]" for n in numbers)
+
+    return _CITE.sub(rewrite, text), found
 
 
 async def list_models() -> list[str]:
@@ -289,7 +317,7 @@ async def answer(question: str, hits: list[Hit], lang: str, screen: str | None =
         return refusal(lang)
 
     # Every number the answer cited, kept only if it was really sent.
-    cited = {int(n) for n in _CITE.findall(text)}
+    text, cited = _citations(text)
     valid = {n for n in cited if 1 <= n <= len(hits)}
     for bad in cited - valid:
         text = text.replace(f"[{bad}]", "")
