@@ -30,6 +30,15 @@ META = "ai_index_meta"
 #: Held between requests. Rebuilt on demand, never per request.
 _index: Index | None = None
 
+#: What the current or last build is doing. A build embeds hundreds of passages
+#: against a rate-limited API, which takes minutes — far longer than a request
+#: should be held open — so it runs in the background and reports here.
+_progress: dict[str, Any] = {"running": False}
+
+
+def progress() -> dict[str, Any]:
+    return dict(_progress)
+
 
 def digest(p: Passage) -> str:
     return hashlib.sha256(p.for_embedding().encode()).hexdigest()[:32]
@@ -69,7 +78,13 @@ async def build(db: AsyncIOMotorDatabase, *, force: bool = False) -> dict[str, A
 
     if fresh:
         logger.info("Embedding %d new or changed passages (%d reused)", len(fresh), reused)
-        vectors = await embeddings.embed_documents([p.for_embedding() for p in fresh])
+
+        def note(done: int, total: int) -> None:
+            _progress.update(embedded=done, to_embed=total)
+
+        vectors = await embeddings.embed_documents(
+            [p.for_embedding() for p in fresh], progress=note
+        )
         for p, v in zip(fresh, vectors, strict=True):
             p.vector = v
 
@@ -98,6 +113,29 @@ async def build(db: AsyncIOMotorDatabase, *, force: bool = False) -> dict[str, A
     _index = Index(passages)
     logger.info("Index built: %d passages", len(passages))
     return {"passages": len(passages), "embedded": len(fresh), "reused": reused, "model": model}
+
+
+async def build_in_background(db: AsyncIOMotorDatabase, *, force: bool = False) -> None:
+    """Run a build without anyone waiting on the HTTP request.
+
+    Progress and the outcome land in `_progress`, which `/ai/status` reports, so
+    a failure halfway through is visible rather than silent.
+    """
+    if _progress.get("running"):
+        logger.info("A build is already running; ignoring the request to start another")
+        return
+
+    _progress.clear()
+    _progress.update(running=True, started_at=datetime.now(timezone.utc), embedded=0, to_embed=0)
+    try:
+        result = await build(db, force=force)
+        _progress.update(running=False, ok=True, finished_at=datetime.now(timezone.utc), **result)
+    except Exception as exc:  # noqa: BLE001 — the point is to report it, not raise into nothing
+        logger.exception("Index build failed")
+        _progress.update(
+            running=False, ok=False, error=str(exc)[:500],
+            finished_at=datetime.now(timezone.utc),
+        )
 
 
 async def load(db: AsyncIOMotorDatabase) -> Index | None:

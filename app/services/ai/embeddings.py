@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 
 import httpx
 
@@ -27,8 +28,12 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 BASE = "https://generativelanguage.googleapis.com/v1beta"
-#: Gemini's own cap on one batchEmbedContents call.
-BATCH = 100
+#: Gemini allows 100 per batchEmbedContents call, but the free tier's real
+#: limit is tokens per minute, not requests: 100 passages at once is around
+#: 60k tokens and is refused outright. Twenty keeps each call inside it.
+BATCH = 20
+#: Breathing room between batches, for the same reason.
+PACE_SECONDS = 1.5
 
 #: Tried in this order when the API offers more than one. Newest first; the
 #: list is a preference, not a requirement, and an unknown model that supports
@@ -113,28 +118,41 @@ async def _post(client: httpx.AsyncClient, model: str, method: str, body: dict) 
     and retrying those only delays the error.
     """
     key = _require_key()
-    last: Exception | None = None
-    for attempt in range(4):
+    # A rate limit is measured per minute, so backing off for fifteen seconds
+    # in total — as this used to — simply fails four times inside the same
+    # window and gives up. These waits cross a minute boundary.
+    waits = (5, 20, 45, 90)
+    detail = "no response"
+    for attempt, wait in enumerate(waits):
         try:
-            r = await client.post(f"{BASE}/{model}:{method}?key={key}", json=body, timeout=90)
-            if r.status_code in (429, 500, 502, 503, 504):
-                raise httpx.HTTPStatusError("transient", request=r.request, response=r)
-            r.raise_for_status()
-            return r.json()
-        except httpx.HTTPStatusError as exc:
-            last = exc
-            if exc.response is not None and exc.response.status_code not in (429, 500, 502, 503, 504):
-                raise EmbeddingError(
-                    f"Gemini rejected the request ({exc.response.status_code}): {exc.response.text[:300]}"
-                ) from exc
-            await asyncio.sleep(2 ** attempt)
+            r = await client.post(f"{BASE}/{model}:{method}?key={key}", json=body, timeout=120)
         except httpx.HTTPError as exc:
-            last = exc
-            await asyncio.sleep(2 ** attempt)
-    raise EmbeddingError(f"Gemini did not answer after 4 attempts: {last}")
+            detail = f"{type(exc).__name__}: {exc}"
+            await asyncio.sleep(wait)
+            continue
+
+        if r.status_code < 400:
+            return r.json()
+
+        detail = f"HTTP {r.status_code}: {r.text[:300]}"
+        if r.status_code not in (429, 500, 502, 503, 504):
+            raise EmbeddingError(f"Gemini rejected the request ({detail})")
+
+        # Honour the server's own retry hint when it gives one.
+        retry_after = r.headers.get("retry-after")
+        delay = wait
+        if retry_after and retry_after.isdigit():
+            delay = max(wait, min(int(retry_after), 120))
+        logger.warning("Gemini %s; waiting %ss (attempt %d/%d)", detail, delay, attempt + 1, len(waits))
+        await asyncio.sleep(delay)
+
+    raise EmbeddingError(f"Gemini did not answer after {len(waits)} attempts. Last: {detail}")
 
 
-async def embed_documents(texts: list[str]) -> list[list[float]]:
+async def embed_documents(
+    texts: list[str],
+    progress: Callable[[int, int], None] | None = None,
+) -> list[list[float]]:
     """Embed the corpus. Batched, because it is run over hundreds of passages."""
     model = await resolve_model()
     out: list[list[float]] = []
@@ -173,6 +191,10 @@ async def embed_documents(texts: list[str]) -> list[list[float]]:
                     got.append(values)
             out.extend(got)
             logger.info("Embedded %d/%d passages", len(out), len(texts))
+            if progress:
+                progress(len(out), len(texts))
+            if start + BATCH < len(texts):
+                await asyncio.sleep(PACE_SECONDS)
     return out
 
 
