@@ -289,16 +289,39 @@ async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | Non
         ],
     }
     headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
-    try:
-        async with httpx.AsyncClient() as client:
-            r = await client.post(GROQ_URL, json=body, headers=headers, timeout=90)
-    except httpx.HTTPError as exc:
-        raise AnswerError(f"Could not reach Groq: {type(exc).__name__}: {exc}") from exc
+
+    # Two short retries. Groq's free tier limits are per minute, so a burst of
+    # questions hits them and a few seconds is usually enough — but somebody is
+    # waiting, so this stays seconds rather than the minute a build can afford.
+    last = "no response"
+    for wait in (2, 6, 0):
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post(GROQ_URL, json=body, headers=headers, timeout=90)
+        except httpx.HTTPError as exc:
+            last = f"Could not reach Groq: {type(exc).__name__}: {exc}"
+            if not wait:
+                break
+            await asyncio.sleep(wait)
+            continue
+
+        if r.status_code < 400:
+            break
+
+        last = f"Groq refused ({r.status_code}): {r.text[:300]}"
+        if r.status_code not in (429, 500, 502, 503, 504) or not wait:
+            break
+        retry_after = r.headers.get("retry-after")
+        delay = int(retry_after) if (retry_after or "").isdigit() else wait
+        logger.warning("Groq %s; waiting %ss", last, min(delay, 10))
+        await asyncio.sleep(min(delay, 10))
+    else:
+        raise AnswerError(last)
 
     if r.status_code >= 400:
         # Surfaced rather than raised bare: an unhandled error here answered
         # every question with a 500 and said nothing about why.
-        raise AnswerError(f"Groq refused ({r.status_code}): {r.text[:300]}")
+        raise AnswerError(last)
 
     try:
         return (r.json()["choices"][0]["message"]["content"] or "").strip()

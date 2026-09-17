@@ -371,7 +371,157 @@ def stem(word: str) -> str:
     return word
 
 
+# --- The app's own scripts ---------------------------------------------------
+# The corpus is written in English; the app is read in four languages. A
+# question typed as "রান্নাঘর কোন দিকে হওয়া উচিত?" reached the tokenizer, which
+# matches [a-z0-9]+, and came out empty — every word discarded, coverage zero,
+# refused. These are the words a question is actually built from, in the three
+# scripts the app ships, mapped to the corpus's English.
+
+NATIVE: dict[str, tuple[str, ...]] = {
+    # Directions — Bengali / Assamese
+    "উত্তর": ("n",), "দক্ষিণ": ("s",), "পূর্ব": ("e",), "পূব": ("e",),
+    "পশ্চিম": ("w",),
+    "উত্তর-পূর্ব": ("ne",), "উত্তরপূর্ব": ("ne",), "ঈশান": ("ne",),
+    "উত্তর-পূব": ("ne",), "উত্তরপূব": ("ne",), "উত্তৰ-পূব": ("ne",),
+    "দক্ষিণ-পূর্ব": ("se",), "দক্ষিণপূর্ব": ("se",), "অগ্নি": ("se",),
+    "দক্ষিণ-পূব": ("se",), "দক্ষিণপূব": ("se",),
+    "দক্ষিণ-পশ্চিম": ("sw",), "দক্ষিণপশ্চিম": ("sw",), "নৈঋত": ("sw",),
+    "উত্তর-পশ্চিম": ("nw",), "উত্তরপশ্চিম": ("nw",), "বায়ব্য": ("nw",),
+    "ব্রহ্মস্থান": ("brahmasthan",), "কেন্দ্র": ("brahmasthan",),
+    "দিক": ("direction", "zone"), "দিশ": ("direction", "zone"),
+    "দিকে": ("direction", "zone"), "দিশত": ("direction", "zone"),
+    # Directions — Devanagari
+    "उत्तर": ("n",), "दक्षिण": ("s",), "पूर्व": ("e",), "पश्चिम": ("w",),
+    "उत्तर-पूर्व": ("ne",), "ईशान": ("ne",), "आग्नेय": ("se",),
+    "दक्षिण-पूर्व": ("se",), "दक्षिण-पश्चिम": ("sw",), "नैऋत्य": ("sw",),
+    "उत्तर-पश्चिम": ("nw",), "वायव्य": ("nw",),
+    "ब्रह्मस्थान": ("brahmasthan",), "केंद्र": ("brahmasthan",),
+    "दिशा": ("direction", "zone"), "दिशाा": ("direction", "zone"),
+
+    # Rooms and things — Bengali / Assamese
+    "রান্নাঘর": ("kitchen",), "রন্ধনঘর": ("kitchen",), "রান্না": ("kitchen",),
+    "রসোইঘর": ("kitchen",), "রসুইঘর": ("kitchen",), "কিচেন": ("kitchen",),
+    "শোবার": ("bedroom",), "শোয়ার": ("bedroom",), "শয়নকক্ষ": ("bedroom",),
+    "বেডরুম": ("bedroom",), "খাট": ("bed",), "বিছানা": ("bed",),
+    "শৌচাগার": ("toilet",), "শৌচালয়": ("toilet",), "বাথরুম": ("bathroom",),
+    "সিঁড়ি": ("staircase",), "সিড়ি": ("staircase",),
+    "দরজা": ("main entrance", "door"), "প্রবেশ": ("main entrance",),
+    "জানালা": ("window",), "জানলা": ("window",),
+    "আলমারি": ("wardrobe",), "আয়না": ("mirror", "dressing table"),
+    "ফ্রিজ": ("refrigerator", "freezer"), "রেফ্রিজারেটর": ("refrigerator",),
+    "মন্দির": ("puja", "puja room", "temple"), "পূজা": ("puja", "puja room"),
+    "ঠাকুরঘর": ("puja room",),
+    "বসার": ("living room",), "বৈঠকখানা": ("drawing room", "living room"),
+    "খাবার": ("dining hall",), "ভাঁড়ার": ("store room",),
+    "সিন্দুক": ("locker",), "লকার": ("locker",),
+    "গাড়ি": ("garage", "parking"), "বারান্দা": ("balcony",),
+    "ছাদ": ("terrace", "overhead water tank"),
+    "কুয়ো": ("borewell", "water"), "নলকূপ": ("borewell",),
+    "ট্যাঙ্ক": ("water tank", "overhead water tank"),
+    "সেপটিক": ("septic tank",), "ময়লা": ("dustbin", "waste"),
+    "ডাস্টবিন": ("dustbin",), "ইনভার্টার": ("inverter",),
+    "সোফা": ("sofa",), "টিভি": ("television",),
+    "ঘর": ("room",), "বাড়ি": ("house", "home"), "বাসা": ("house", "home"),
+
+    # Rooms and things — Devanagari
+    "रसोई": ("kitchen",), "रसोईघर": ("kitchen",), "किचन": ("kitchen",),
+    "शयनकक्ष": ("bedroom",), "बेडरूम": ("bedroom",), "पलंग": ("bed",),
+    "बिस्तर": ("bed",), "शौचालय": ("toilet",), "बाथरूम": ("bathroom",),
+    "सीढ़ी": ("staircase",), "सीढ़ियाँ": ("staircase",),
+    "दरवाजा": ("main entrance", "door"), "दरवाज़ा": ("main entrance", "door"),
+    "मुख्य": ("main entrance",), "खिड़की": ("window",),
+    "अलमारी": ("wardrobe",), "दर्पण": ("mirror",), "शीशा": ("mirror",),
+    "फ्रिज": ("refrigerator", "freezer"), "मंदिर": ("puja", "puja room", "temple"),
+    "पूजा": ("puja", "puja room"), "बैठक": ("living room", "drawing room"),
+    "भोजन": ("dining hall",), "भंडार": ("store room",),
+    "तिजोरी": ("locker",), "गैराज": ("garage",), "बालकनी": ("balcony",),
+    "छत": ("terrace", "overhead water tank"), "कुआं": ("borewell", "water"),
+    "टंकी": ("water tank", "overhead water tank"),
+    "सेप्टिक": ("septic tank",), "कूड़ा": ("dustbin", "waste"),
+    "इन्वर्टर": ("inverter",), "सोफा": ("sofa",),
+    "कमरा": ("room",), "घर": ("house", "home"), "मकान": ("house", "home"),
+
+    # What people ask about
+    "রং": ("colour",), "রঙ": ("colour",), "রঙের": ("colour",),
+    "रंग": ("colour",), "प्रतिकार": ("remedy", "treatment"),
+    "প্রতিকার": ("remedy", "treatment"), "উপায়": ("remedy", "treatment"),
+    "उपाय": ("remedy", "treatment"), "समाधान": ("remedy", "solution"),
+    "সমাধান": ("remedy", "solution"), "দোষ": ("dosh", "defect"),
+    "दोष": ("dosh", "defect"), "পিতৃ": ("pitra", "ancestor"),
+    "পিত্র": ("pitra", "ancestor"), "पितृ": ("pitra", "ancestor"),
+    "পূর্বপুরুষ": ("pitra", "ancestor"), "पूर्वज": ("pitra", "ancestor"),
+    "বাস্তু": ("vastu",), "वास्तु": ("vastu",),
+    "অর্থ": ("wealth", "financial"), "ধন": ("wealth",), "টাকা": ("wealth", "financial"),
+    "धन": ("wealth",), "पैसा": ("wealth", "financial"),
+    "স্বাস্থ্য": ("health",), "स्वास्थ्य": ("health",),
+    "সম্পর্ক": ("relationship",), "रिश्ते": ("relationship",),
+    "কর্ম": ("career", "work"), "कैरियर": ("career",), "नौकरी": ("career", "job"),
+    "পড়াশোনা": ("study room", "education"), "पढ़ाई": ("study room", "education"),
+    "জোন": ("zone",), "ज़ोन": ("zone",), "क्षेत्र": ("zone",),
+    "স্থান": ("placement", "position"), "स्थान": ("placement", "position"),
+}
+
+#: Assamese writes ৰ and ৱ where Bengali writes র and ব — the same words in a
+#: different hand. Folded together so one entry serves both.
+NATIVE_FOLD = str.maketrans({"ৰ": "র", "ৱ": "ব", "ঽ": "", "\u200c": "", "\u200d": ""})
+
+#: Case endings. Bengali and Hindi inflect the noun rather than adding a
+#: preposition, so "দক্ষিণ-পূর্বে" ("in the south-east") never matched the
+#: entry for "দক্ষিণ-পূর্ব". Longest first.
+NATIVE_ENDINGS: tuple[str, ...] = (
+    "গুলোতে", "গুলিতে", "খানাতে", "গুলো", "গুলি", "খানা", "টাতে", "টিতে",
+    "য়ের", "েতে", "ের", "েৰ", "তে", "টা", "টি", "রা", "কে", "য়", "ে",
+    "ত", "র", "ও", "ं", "ों", "ें", "ाँ", "ी", "े", "ा", "ो",
+)
+
+
+def native_lookup(word: str) -> tuple[str, ...] | None:
+    """Find a native word, allowing for script and case endings.
+
+    Tried in order: the word as written, the word with Assamese letters folded
+    to their Bengali equivalents, and then that with one case ending removed.
+    """
+    if hit := NATIVE.get(word):
+        return hit
+    folded = word.translate(NATIVE_FOLD)
+    if hit := NATIVE.get(folded):
+        return hit
+    for ending in NATIVE_ENDINGS:
+        if folded.endswith(ending) and len(folded) - len(ending) >= 2:
+            if hit := NATIVE.get(folded[: -len(ending)]):
+                return hit
+    return None
+
+
+def is_native_stop(word: str) -> bool:
+    folded = word.translate(NATIVE_FOLD)
+    return word in NATIVE_STOP or folded in NATIVE_STOP
+
+
+#: Script-only function words: they carry grammar, not subject.
+NATIVE_STOP = {
+    "কোন", "কোনো", "কী", "কি", "হবে", "হয়", "উচিত", "করা", "করতে", "আর",
+    "এই", "ওই", "এর", "এবং", "কিন্তু", "জন্য", "নিয়ে", "থেকে", "মধ্যে",
+    "ভালো", "খারাপ", "আছে", "নেই", "যায়", "লাগে", "বলুন", "বল", "সম্পর্কে",
+    "किस", "कौन", "कौनसी", "क्या", "कैसे", "होनी", "होना", "चाहिए", "है",
+    "हैं", "और", "यह", "वह", "के", "का", "की", "को", "में", "से", "लिए",
+    "अच्छा", "बुरा", "बताएं", "बारे", "बताइए",
+    "কোনবোৰ", "হ'ব", "লাগে", "কৰক", "সুধক", "বিষয়ে", "আৰু",
+    # Bengali: pronouns, question words and the verbs a question is built from.
+    "আমার", "আমাদের", "আমি", "তোমার", "আপনার", "কোথায়", "কোথা", "কেমন",
+    "কেন", "হওয়া", "হয়", "হবে", "হচ্ছে", "করব", "করবো", "রাখব", "রাখবো",
+    "রাখা", "রাখতে", "দেব", "দেবো", "যদি", "তাহলে", "মানে", "বলো", "বলুন",
+    "জানতে", "চাই", "নাকি", "কিনা", "সেটা", "এটা", "ওটা", "টা", "টি",
+    "খুব", "একটু", "একটা", "কোনটা", "কেমনে", "কিভাবে", "কীভাবে",
+    # Devanagari: the same.
+    "मेरा", "मेरी", "हमारा", "आपका", "कहाँ", "कहां", "कैसा", "कैसी", "क्यों",
+    "करना", "करूँ", "रखना", "रखूँ", "देना", "अगर", "तो", "मतलब", "बताओ",
+    "जानना", "चाहता", "चाहती", "नहीं", "वो", "इस", "उस", "एक", "बहुत",
+    "थोड़ा", "कौनसा", "कैसे",
+}
+
 #: The longest phrase, in words, that any key here spans.
 MAX_PHRASE = max(
-    len(k.split()) for k in list(ALIASES) + list(DIRECTIONS)
+    len(k.split()) for k in list(ALIASES) + list(DIRECTIONS) + list(NATIVE)
 )
