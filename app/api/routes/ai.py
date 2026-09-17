@@ -130,7 +130,7 @@ async def ask(
             logger.warning("Falling back to keyword-only retrieval: %s", exc)
 
     rel = index.relevance(question, vector)
-    if not answering.should_answer(rel):
+    if answering.looks_like_injection(question) or not answering.should_answer(rel):
         logger.info(
             "Off-topic question refused (coverage=%.2f lex=%.2f dense=%.2f unknown=%s): %r",
             rel.coverage, rel.lexical, rel.dense, rel.unknown[:5], question[:120],
