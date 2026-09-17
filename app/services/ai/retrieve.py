@@ -63,11 +63,27 @@ STOP = {
     "korbe", "dao", "dibo", "debo", "pabo", "bolo", "bol", "koro",
 }
 
-_TOKEN = re.compile(r"[a-z0-9]+")
+_NATIVE_CHARS = re.compile(r"[\u0900-\u097F\u0980-\u09FF]")
+
+#: Latin letters and digits, or a run of Devanagari, Bengali or Assamese.
+#: The old pattern was [a-z0-9]+, which silently discarded every character of a
+#: question typed in the app's own scripts — the whole question came out empty
+#: and was refused for having no words the app knew.
+_TOKEN = re.compile(r"[a-z0-9]+|[\u0900-\u097F\u0980-\u09FF]+")
 
 
 def _words(text: str) -> list[str]:
-    return _TOKEN.findall(text.lower())
+    """Words, with single-character Indic fragments dropped.
+
+    An apostrophe inside an Assamese verb — "হ'ব" — splits it into two
+    one-letter pieces. They mean nothing on their own, and counted as words the
+    app does not know they were enough to fail the coverage test on a short
+    question.
+    """
+    return [
+        w for w in _TOKEN.findall(text.lower())
+        if not (len(w) == 1 and _NATIVE_CHARS.match(w))
+    ]
 
 
 def tokenize(text: str) -> list[str]:
@@ -113,6 +129,12 @@ def tokenize(text: str) -> list[str]:
                 matched = True
                 break
 
+            if native := lexicon.native_lookup(phrase):
+                out.extend(stem(a) for a in _expand(native))
+                i += span
+                matched = True
+                break
+
             if aliases := lexicon.ALIASES.get(phrase):
                 out.extend(stem(a) for a in _expand(aliases))
                 if span == 1:
@@ -125,11 +147,17 @@ def tokenize(text: str) -> list[str]:
             continue
 
         w = words[i]
-        if w not in STOP:
+        # A native word with no entry carries nothing the English corpus can
+        # match, so it is dropped rather than added as a term nothing contains.
+        if w not in STOP and not lexicon.is_native_stop(w) and not _is_native(w):
             out.append(stem(w))
         i += 1
 
     return out
+
+
+def _is_native(word: str) -> bool:
+    return bool(_NATIVE_CHARS.search(word))
 
 
 def understood(text: str, vocab: set[str]) -> tuple[float, list[str]]:
@@ -142,7 +170,7 @@ def understood(text: str, vocab: set[str]) -> tuple[float, list[str]]:
     Understanding a word is not the same as having seen it.
     """
     words = _words(text)
-    content = [w for w in words if w not in STOP]
+    content = [w for w in words if w not in STOP and not lexicon.is_native_stop(w)]
     if not content:
         return 0.0, []
 
@@ -158,6 +186,7 @@ def understood(text: str, vocab: set[str]) -> tuple[float, list[str]]:
                 phrase in lexicon.DIRECTIONS
                 or joined in lexicon.DIRECTIONS
                 or phrase in lexicon.ALIASES
+                or lexicon.native_lookup(phrase) is not None
             ):
                 known.extend([True] * span)
                 i += span

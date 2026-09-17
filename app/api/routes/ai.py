@@ -12,6 +12,7 @@ unauthenticated caller is counted against their device instead.
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
@@ -151,7 +152,7 @@ async def ask(
 
     return AskResponse(
         answer=result.text,
-        sources=[SourceOut(**vars(s)) for s in result.sources],
+        sources=[SourceOut(**asdict(s)) for s in result.sources],
         answered=result.answered,
         remaining=remaining,
     )
