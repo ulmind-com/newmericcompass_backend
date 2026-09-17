@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
@@ -151,20 +151,27 @@ async def ask(
 
 @router.post("/reindex", summary="Rebuild the assistant's index (admin)")
 async def reindex(
+    background: BackgroundTasks,
     db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
     _: Annotated[TokenData, Depends(get_current_admin)],
     force: bool = False,
 ):
-    """Re-read the corpus and embed whatever changed.
+    """Start re-reading the corpus and embedding whatever changed.
+
+    Returns as soon as the work is started, because embedding several hundred
+    passages against a rate-limited API takes minutes and no proxy will hold a
+    request open that long. Watch `/ai/status` for progress.
 
     Run this after editing rules, tips, categories or day protocols in the admin
     panel, and after shipping new app content. Unchanged passages keep the
     vectors they have, so this is cheap unless `force` is set.
     """
-    try:
-        return await store.build(db, force=force)
-    except embeddings.EmbeddingError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not embeddings.is_configured():
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not set.")
+    if store.progress().get("running"):
+        return {"started": False, "reason": "A build is already running.", "progress": store.progress()}
+    background.add_task(store.build_in_background, db, force=force)
+    return {"started": True, "watch": "/api/ai/status"}
 
 
 @router.get("/models", summary="Embedding models this Gemini key can use (admin)")
@@ -196,6 +203,7 @@ async def status(
 ):
     meta = await db[store.META].find_one({"_id": "index"}) or {}
     return {
+        "building": store.progress(),
         "passages": await db[store.COLLECTION].count_documents({}),
         "embeddings_configured": embeddings.is_configured(),
         "answering_configured": answering.is_configured(),
