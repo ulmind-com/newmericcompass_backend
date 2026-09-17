@@ -167,6 +167,28 @@ async def reindex(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.get("/models", summary="Embedding models this Gemini key can use (admin)")
+async def models(_: Annotated[TokenData, Depends(get_current_admin)]):
+    """What the key actually serves, and which one would be chosen.
+
+    Here because the model name is not ours to know: Google retires them, and
+    when embedding starts answering 404 this is the first thing to look at.
+    """
+    try:
+        found = await embeddings.list_models()
+    except embeddings.EmbeddingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    usable = [
+        m["name"] for m in found
+        if "embedContent" in (m.get("supportedGenerationMethods") or [])
+    ]
+    return {
+        "embedding_models": usable,
+        "chosen": await embeddings.resolve_model() if usable else None,
+        "configured_override": settings.GEMINI_EMBED_MODEL,
+    }
+
+
 @router.get("/status", summary="What the assistant currently knows (admin)")
 async def status(
     db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],

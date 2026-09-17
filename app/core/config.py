@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # as unconfigured rather than failing a request at a time.
     GEMINI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
+    # Left unset, the embedding model is discovered from the API — Google
+    # retires these names, and a hardcoded one turns into a 404 without warning.
+    GEMINI_EMBED_MODEL: Optional[str] = None
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     # Questions one person may ask in a day. The assistant is free, so this is
     # what stands between it and a bill.
