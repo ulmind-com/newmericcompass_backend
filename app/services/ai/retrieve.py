@@ -26,6 +26,9 @@ from app.services.ai import lexicon
 from app.services.ai.corpus import Passage
 from app.services.ai.lexicon import stem
 
+#: Built once: the words the lexicon says this app is about.
+_SUBJECTS = lexicon.subjects()
+
 #: Words that match everything and therefore distinguish nothing.
 #:
 #: The Hinglish and Bengali function words are here for a reason. Questions
@@ -240,6 +243,8 @@ class Relevance:
     heading_terms: int
     #: How many distinct terms the question has at all, after stop words.
     terms: int
+    #: Whether a term matched in a heading is one the app is organised around.
+    heading_subject: bool
     #: Best cosine similarity against any one passage; 0 without a vector.
     dense: float
     #: The question's words the corpus has never heard of.
@@ -417,16 +422,22 @@ class Index:
         heading = self.head.score(terms)
         dense = self._cosine(query_vector) if query_vector else np.zeros_like(lexical)
         wanted = set(terms)
-        best_terms = max(
-            (len(wanted & set(tf)) for tf in self.head.tf),
-            default=0,
-        )
+        best_terms = 0
+        on_subject = False
+        for tf in self.head.tf:
+            hit = wanted & set(tf)
+            if not hit:
+                continue
+            best_terms = max(best_terms, len(hit))
+            if hit & _SUBJECTS:
+                on_subject = True
         return Relevance(
             coverage=coverage,
             lexical=float(lexical.max()) if len(lexical) else 0.0,
             heading=float(heading.max()) if len(heading) else 0.0,
             heading_terms=best_terms,
             terms=len(wanted),
+            heading_subject=on_subject,
             dense=float(dense.max()) if len(dense) else 0.0,
             unknown=unknown,
         )

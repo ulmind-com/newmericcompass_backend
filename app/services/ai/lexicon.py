@@ -521,6 +521,27 @@ NATIVE_STOP = {
     "थोड़ा", "कौनसा", "कैसे",
 }
 
+def subjects() -> set[str]:
+    """Every word this file says the app is about.
+
+    The right-hand sides of the alias tables, plus the compass codes. These are
+    the corpus's own subject words — kitchen, staircase, wardrobe, remedy, NE —
+    as opposed to words that merely appear in it.
+
+    It answers a question nothing else could. "Is a staircase in the centre
+    bad?" and "tell me about football" both match exactly one word in exactly
+    one heading, and rarity cannot tell them apart: football is the rarer word
+    of the two. What separates them is that one of them is something this app
+    is organised around and the other is not.
+    """
+    out: set[str] = set(DIRECTIONS.values())
+    for table in (ALIASES, NATIVE):
+        for words in table.values():
+            for phrase in words:
+                out.update(stem(w) for w in phrase.split())
+    return out
+
+
 #: The longest phrase, in words, that any key here spans.
 MAX_PHRASE = max(
     len(k.split()) for k in list(ALIASES) + list(DIRECTIONS) + list(NATIVE)

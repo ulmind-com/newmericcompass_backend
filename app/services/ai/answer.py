@@ -124,8 +124,11 @@ Rules you must follow:
 
 1. Use ONLY the passages. Never use anything you know from outside them. If the \
 passages do not contain the answer, say so plainly and stop.
-2. Cite as you go. After each sentence or bullet that makes a claim, put the \
-passage number(s) it came from in square brackets, like [3] or [1][4].
+2. Cite as you go, in square brackets. After each sentence or bullet that \
+makes a claim, put the passage number(s) it came from: [3], or [1][4]. This is \
+not optional and it is not decoration — an answer that cites nothing is \
+discarded before the reader sees it, so an uncited answer is the same as no \
+answer at all.
 3. Never invent a passage number. Only cite numbers that appear below.
 4. Do not soften or embellish. If a passage says a placement is to be avoided, \
 say it is to be avoided.
@@ -190,8 +193,13 @@ def should_answer(rel: Relevance) -> bool:
     # every word does. "What is the Brahmasthan" has one word that matters and
     # a heading carries it; "recommend a good movie" has three and one heading
     # happens to contain one of them.
-    named = rel.heading_terms >= MIN_HEADING_TERMS or (
-        rel.terms > 0 and rel.heading_terms == rel.terms
+    named = (
+        rel.heading_terms >= MIN_HEADING_TERMS
+        or (rel.terms > 0 and rel.heading_terms == rel.terms)
+        # One word is enough when it is one of the app's own subjects.
+        # "Is a staircase in the centre bad?" names a staircase; "tell me about
+        # football" matches a heading by accident.
+        or (rel.heading_terms >= 1 and rel.heading_subject)
     )
     return named or rel.dense >= MIN_DENSE
 
