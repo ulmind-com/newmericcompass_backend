@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 
 import httpx
@@ -34,6 +35,20 @@ BASE = "https://generativelanguage.googleapis.com/v1beta"
 BATCH = 20
 #: Breathing room between batches, for the same reason.
 PACE_SECONDS = 1.5
+
+#: How long to keep trying. A build runs in the background and can afford to
+#: wait out a rate-limit window; a question cannot. Embedding a question with
+#: the build's patience made every question take three minutes once the daily
+#: quota ran out, which is worse than not embedding it at all.
+BUILD_WAITS = (5, 20, 45, 90)
+QUERY_WAITS = (1,)
+QUERY_TIMEOUT = 10.0
+
+#: When the quota is gone it is gone for the rest of the day, so questions stop
+#: asking for a while rather than paying the timeout every time. Retrieval falls
+#: back to keywords, which is what this window is for.
+_COOLDOWN_SECONDS = 900
+_unavailable_until = 0.0
 
 #: Tried in this order when the API offers more than one. Newest first; the
 #: list is a preference, not a requirement, and an unknown model that supports
@@ -111,21 +126,27 @@ async def resolve_model() -> str:
         return _model
 
 
-async def _post(client: httpx.AsyncClient, model: str, method: str, body: dict) -> dict:
+async def _post(
+    client: httpx.AsyncClient,
+    model: str,
+    method: str,
+    body: dict,
+    *,
+    waits: tuple[int, ...] = BUILD_WAITS,
+    timeout: float = 120.0,
+) -> dict:
     """One call, retried on the failures that are worth retrying.
 
     Rate limits and 5xx are transient; a bad key or a malformed request is not,
-    and retrying those only delays the error.
+    and retrying those only delays the error. `waits` is how patient to be — a
+    rate limit is measured per minute, so a build's waits cross a minute
+    boundary rather than failing four times inside the same window.
     """
     key = _require_key()
-    # A rate limit is measured per minute, so backing off for fifteen seconds
-    # in total — as this used to — simply fails four times inside the same
-    # window and gives up. These waits cross a minute boundary.
-    waits = (5, 20, 45, 90)
     detail = "no response"
     for attempt, wait in enumerate(waits):
         try:
-            r = await client.post(f"{BASE}/{model}:{method}?key={key}", json=body, timeout=120)
+            r = await client.post(f"{BASE}/{model}:{method}?key={key}", json=body, timeout=timeout)
         except httpx.HTTPError as exc:
             detail = f"{type(exc).__name__}: {exc}"
             await asyncio.sleep(wait)
@@ -199,14 +220,37 @@ async def embed_documents(
 
 
 async def embed_query(text: str) -> list[float]:
-    """Embed one question, as a question."""
-    model = await resolve_model()
-    async with httpx.AsyncClient() as client:
-        data = await _post(client, model, "embedContent", {
-            "model": model,
-            "content": {"parts": [{"text": text}]},
-            "taskType": "RETRIEVAL_QUERY",
-        })
+    """Embed one question, as a question — quickly, or not at all.
+
+    A person is waiting on this, so there is one attempt and a short timeout.
+    If it fails the caller falls back to keyword search, and the service is
+    left alone for a while rather than being asked again on every question.
+    """
+    global _unavailable_until
+    if time.monotonic() < _unavailable_until:
+        raise EmbeddingError("Embedding is in cooldown after a quota or rate-limit failure.")
+
+    try:
+        model = await resolve_model()
+        async with httpx.AsyncClient() as client:
+            data = await _post(
+                client, model, "embedContent",
+                {
+                    "model": model,
+                    "content": {"parts": [{"text": text}]},
+                    "taskType": "RETRIEVAL_QUERY",
+                },
+                waits=QUERY_WAITS,
+                timeout=QUERY_TIMEOUT,
+            )
+    except EmbeddingError:
+        _unavailable_until = time.monotonic() + _COOLDOWN_SECONDS
+        logger.warning(
+            "Embedding unavailable; questions will use keyword search for the next %d minutes",
+            _COOLDOWN_SECONDS // 60,
+        )
+        raise
+
     values = data.get("embedding", {}).get("values")
     if not values:
         raise EmbeddingError("Gemini returned no vector for the question.")
