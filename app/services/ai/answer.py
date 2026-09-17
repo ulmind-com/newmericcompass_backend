@@ -84,11 +84,13 @@ MIN_COVERAGE = 0.75
 #: the app names it in a heading, while those three match only in bodies.
 #: Measured over the shipped corpus, on-topic questions score 3.4 to 26 on the
 #: heading field and those three score 0.0, 2.3 and 2.8.
-MIN_HEADING = 3.0
-#: A question can also earn its way through on sheer weight of match, for the
-#: case where a heading happens not to carry the words used. On-topic questions
-#: reach 13 to 92 here; the off-topic ones that clear coverage reach 12 at most.
-MIN_LEXICAL = 25.0
+#:
+#: Counted, not scored. BM25 magnitudes move with the size of the corpus: these
+#: were first set as scores against the app's own 581 passages, and once the
+#: admin panel's 691 were indexed too the same questions scored differently and
+#: were refused. Two of a question's words naming one passage means the same
+#: thing at any corpus size.
+MIN_HEADING_TERMS = 2
 #: Or on meaning, once the corpus is embedded.
 MIN_DENSE = 0.50
 
@@ -184,11 +186,14 @@ def should_answer(rel: Relevance) -> bool:
     """
     if rel.coverage < MIN_COVERAGE:
         return False
-    return (
-        rel.heading >= MIN_HEADING
-        or rel.lexical >= MIN_LEXICAL
-        or rel.dense >= MIN_DENSE
+    # Two of the question's words naming one passage, or a short question whose
+    # every word does. "What is the Brahmasthan" has one word that matters and
+    # a heading carries it; "recommend a good movie" has three and one heading
+    # happens to contain one of them.
+    named = rel.heading_terms >= MIN_HEADING_TERMS or (
+        rel.terms > 0 and rel.heading_terms == rel.terms
     )
+    return named or rel.dense >= MIN_DENSE
 
 
 def refusal(lang: str) -> Answer:
