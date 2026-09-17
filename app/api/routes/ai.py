@@ -25,7 +25,7 @@ from app.core.config import settings
 from app.core.database import get_database
 from app.core.security import TokenData, get_current_admin
 from app.services.ai import answer as answering
-from app.services.ai import embeddings, store
+from app.services.ai import embeddings, retrieve, store
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -209,6 +209,7 @@ async def models(_: Annotated[TokenData, Depends(get_current_admin)]):
 async def diagnose(
     db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
     _: Annotated[TokenData, Depends(get_current_admin)],
+    q: Optional[str] = None,
 ):
     """Exercise retrieval, embedding and answering, and say what each one did.
 
@@ -235,6 +236,26 @@ async def diagnose(
         report["answering_model"] = await answering.resolve_model()
     except Exception as exc:  # noqa: BLE001
         report["answering_model"] = f"FAILED: {exc}"
+
+    # Why one particular question was accepted or refused. The gate reads four
+    # numbers and the answer is obvious once you can see them; without this
+    # they can only be guessed at from outside.
+    if index and q:
+        rel = index.relevance(q, None)
+        heads = [h.passage.heading for h in index.search(q, None, k=3)]
+        return {
+            "question": q,
+            "terms": sorted(set(retrieve.tokenize(q))),
+            "coverage": round(rel.coverage, 2),
+            "unknown": rel.unknown,
+            "heading_terms": rel.heading_terms,
+            "distinct_terms": rel.terms,
+            "heading_subject": rel.heading_subject,
+            "lexical": round(rel.lexical, 2),
+            "would_answer": answering.should_answer(rel),
+            "injection": answering.looks_like_injection(q),
+            "top": heads,
+        }
 
     if index:
         rel = index.relevance("where should the kitchen go", None)
