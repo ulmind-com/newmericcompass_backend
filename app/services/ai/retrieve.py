@@ -142,6 +142,11 @@ class Index:
     def _build_dense(self) -> None:
         vectors = [p.vector for p in self.passages if p.vector]
         self.has_vectors = len(vectors) == len(self.passages) and bool(vectors)
+        # A half-built index, or one left over from a different embedding model,
+        # would stack ragged rows and raise deep inside numpy. Searching by
+        # keyword alone is the honest fallback.
+        if self.has_vectors and len({len(v) for v in vectors}) != 1:
+            self.has_vectors = False
         if not self.has_vectors:
             self.matrix = None
             return

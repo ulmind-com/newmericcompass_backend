@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -40,6 +41,16 @@ async def build(db: AsyncIOMotorDatabase, *, force: bool = False) -> dict[str, A
         raise embeddings.EmbeddingError("GEMINI_API_KEY is not set, so the index cannot be built.")
 
     passages = await corpus.load_all(db)
+    model = await embeddings.resolve_model()
+
+    # Vectors from two different models cannot be compared, and they are not
+    # even the same length. When the model changes — which it does on Google's
+    # schedule, not ours — everything is re-embedded rather than mixed.
+    meta = await db[META].find_one({"_id": "index"}) or {}
+    if meta.get("model") and meta["model"] != model:
+        logger.info("Embedding model changed from %s to %s; rebuilding in full", meta["model"], model)
+        force = True
+
     existing = {
         d["_id"]: d
         for d in await db[COLLECTION].find({}, {"vector": 1, "hash": 1}).to_list(length=20000)
@@ -72,14 +83,21 @@ async def build(db: AsyncIOMotorDatabase, *, force: bool = False) -> dict[str, A
 
     await db[META].update_one(
         {"_id": "index"},
-        {"$set": {"passages": len(passages), "embedded": len(fresh), "reused": reused}},
+        {"$set": {
+            "passages": len(passages),
+            "embedded": len(fresh),
+            "reused": reused,
+            "model": model,
+            "dims": len(passages[0].vector) if passages else 0,
+            "built_at": datetime.now(timezone.utc),
+        }},
         upsert=True,
     )
 
     global _index
     _index = Index(passages)
     logger.info("Index built: %d passages", len(passages))
-    return {"passages": len(passages), "embedded": len(fresh), "reused": reused}
+    return {"passages": len(passages), "embedded": len(fresh), "reused": reused, "model": model}
 
 
 async def load(db: AsyncIOMotorDatabase) -> Index | None:
