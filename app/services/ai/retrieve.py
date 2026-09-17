@@ -228,11 +228,18 @@ class Relevance:
     #: Best BM25 score against any one passage.
     lexical: float
     #: Best BM25 score against any one passage's heading trail.
-    #:
-    #: A question about something the app covers names it, and the app names it
-    #: in a heading. A question built from ordinary words the corpus happens to
-    #: contain — "how to lose weight fast" — matches only in bodies.
     heading: float
+    #: How many of the question's distinct terms appear in one passage's
+    #: heading trail — the most any single heading manages.
+    #:
+    #: A count, not a score, and that is the point: BM25 magnitudes move with
+    #: the size of the corpus, so a threshold tuned on the app's own 581
+    #: passages refused perfectly good questions once the 691 from the admin
+    #: panel were indexed alongside them. "Two of this question's words name
+    #: this passage" means the same thing whatever else is in the index.
+    heading_terms: int
+    #: How many distinct terms the question has at all, after stop words.
+    terms: int
     #: Best cosine similarity against any one passage; 0 without a vector.
     dense: float
     #: The question's words the corpus has never heard of.
@@ -409,10 +416,17 @@ class Index:
         lexical = self._bm25(terms)
         heading = self.head.score(terms)
         dense = self._cosine(query_vector) if query_vector else np.zeros_like(lexical)
+        wanted = set(terms)
+        best_terms = max(
+            (len(wanted & set(tf)) for tf in self.head.tf),
+            default=0,
+        )
         return Relevance(
             coverage=coverage,
             lexical=float(lexical.max()) if len(lexical) else 0.0,
             heading=float(heading.max()) if len(heading) else 0.0,
+            heading_terms=best_terms,
+            terms=len(wanted),
             dense=float(dense.max()) if len(dense) else 0.0,
             unknown=unknown,
         )
