@@ -242,7 +242,7 @@ async def resolve_model() -> str:
         return _model
 
 
-async def _ask_groq(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
+async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
     where = (
         f"\n\nThe person is currently reading the \"{screen}\" screen, so prefer "
         f"passages from there when they answer the question equally well."
@@ -283,7 +283,7 @@ async def answer(question: str, hits: list[Hit], lang: str, screen: str | None =
     if not hits:
         return refusal(lang)
 
-    text = await _ask_groq(question, hits, lang, screen)
+    text = await ask_model(question, hits, lang, screen)
 
     if not text or "INSUFFICIENT_CONTEXT" in text:
         return refusal(lang)

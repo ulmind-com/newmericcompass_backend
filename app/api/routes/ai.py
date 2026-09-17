@@ -242,8 +242,20 @@ async def diagnose(
             "lexical": round(rel.lexical, 2),
             "would_answer": answering.should_answer(rel),
         }
+        hits = index.search("where should the kitchen go", None, k=4)
+        report["retrieved"] = [h.passage.heading for h in hits]
+
+        # The model's reply before any checking, because "it refused" and "it
+        # answered but did not cite" look identical from the outside and need
+        # opposite fixes.
         try:
-            hits = index.search("where should the kitchen go", None, k=4)
+            report["model_said"] = (
+                await answering.ask_model("Where should the kitchen go?", hits, "en", None)
+            )[:1200]
+        except Exception as exc:  # noqa: BLE001
+            report["model_said"] = f"FAILED: {exc}"
+
+        try:
             answer = await answering.answer("Where should the kitchen go?", hits, "en")
             report["end_to_end"] = {
                 "answered": answer.answered,
