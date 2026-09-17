@@ -16,7 +16,7 @@ answering a question about the weather from a Vastu corpus if it is never asked.
 
 from __future__ import annotations
 
-import json
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -28,7 +28,29 @@ from app.services.ai.retrieve import Hit, Relevance
 
 logger = logging.getLogger(__name__)
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_BASE = "https://api.groq.com/openai/v1"
+GROQ_URL = f"{GROQ_BASE}/chat/completions"
+
+#: Answering models, most wanted first. Like the embedding model, this is a
+#: preference and not a requirement: Groq retires model names, and the last
+#: hardcoded one turned every question into a 500. The list is filtered against
+#: what the account can actually see.
+PREFERRED_MODELS = (
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "llama-3.1-8b-instant",
+    "llama3-70b-8192",
+)
+
+#: Never pick one of these for writing an answer, whatever the account lists.
+NOT_FOR_CHAT = ("whisper", "tts", "guard", "embed", "vision", "distil")
+
+_model: str | None = None
+_model_lock = asyncio.Lock()
+
+
+class AnswerError(RuntimeError):
+    """Groq could not be reached, or would not answer."""
 
 LANG_NAMES = {
     "en": "English",
@@ -136,6 +158,52 @@ def _context(hits: list[Hit]) -> str:
 _CITE = re.compile(r"\[(\d+)\]")
 
 
+async def list_models() -> list[str]:
+    """Every model this Groq key can see."""
+    headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{GROQ_BASE}/models", headers=headers, timeout=30)
+        if r.status_code >= 400:
+            raise AnswerError(f"Groq would not list models ({r.status_code}): {r.text[:200]}")
+        return [m["id"] for m in r.json().get("data", [])]
+
+
+async def resolve_model() -> str:
+    """Which model writes the answers, worked out once and remembered."""
+    global _model
+    if _model:
+        return _model
+
+    async with _model_lock:
+        if _model:
+            return _model
+
+        if configured := settings.GROQ_MODEL:
+            available = await list_models()
+            if configured in available:
+                _model = configured
+                return _model
+            logger.warning(
+                "GROQ_MODEL %r is not available on this account; choosing another", configured
+            )
+        else:
+            available = await list_models()
+
+        usable = [m for m in available if not any(bad in m.lower() for bad in NOT_FOR_CHAT)]
+        if not usable:
+            raise AnswerError(f"This Groq key serves no chat model. Saw: {', '.join(available[:10])}")
+
+        for name in PREFERRED_MODELS:
+            if name in usable:
+                _model = name
+                break
+        else:
+            _model = usable[0]
+
+        logger.info("Answering with %s (%d chat models available)", _model, len(usable))
+        return _model
+
+
 async def _ask_groq(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
     where = (
         f"\n\nThe person is currently reading the \"{screen}\" screen, so prefer "
@@ -143,7 +211,7 @@ async def _ask_groq(question: str, hits: list[Hit], lang: str, screen: str | Non
         if screen else ""
     )
     body = {
-        "model": settings.GROQ_MODEL,
+        "model": await resolve_model(),
         "temperature": 0.2,
         "max_tokens": 1200,
         "messages": [
@@ -155,13 +223,21 @@ async def _ask_groq(question: str, hits: list[Hit], lang: str, screen: str | Non
         ],
     }
     headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
-    async with httpx.AsyncClient() as client:
-        r = await client.post(GROQ_URL, json=body, headers=headers, timeout=90)
-        if r.status_code >= 400:
-            logger.error("Groq refused: %s %s", r.status_code, r.text[:300])
-            r.raise_for_status()
-        data = r.json()
-    return (data["choices"][0]["message"]["content"] or "").strip()
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(GROQ_URL, json=body, headers=headers, timeout=90)
+    except httpx.HTTPError as exc:
+        raise AnswerError(f"Could not reach Groq: {type(exc).__name__}: {exc}") from exc
+
+    if r.status_code >= 400:
+        # Surfaced rather than raised bare: an unhandled error here answered
+        # every question with a 500 and said nothing about why.
+        raise AnswerError(f"Groq refused ({r.status_code}): {r.text[:300]}")
+
+    try:
+        return (r.json()["choices"][0]["message"]["content"] or "").strip()
+    except (KeyError, IndexError, ValueError) as exc:
+        raise AnswerError(f"Groq sent an answer we could not read: {r.text[:200]}") from exc
 
 
 async def answer(question: str, hits: list[Hit], lang: str, screen: str | None = None) -> Answer:

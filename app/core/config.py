@@ -47,7 +47,9 @@ class Settings(BaseSettings):
     # Left unset, the embedding model is discovered from the API — Google
     # retires these names, and a hardcoded one turns into a 404 without warning.
     GEMINI_EMBED_MODEL: Optional[str] = None
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    # Left unset, the answering model is discovered too — Groq retires names
+    # the same way, and the last hardcoded one turned every question into a 500.
+    GROQ_MODEL: Optional[str] = None
     # Questions one person may ask in a day. The assistant is free, so this is
     # what stands between it and a bill.
     AI_DAILY_LIMIT: int = 20
