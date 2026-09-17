@@ -130,7 +130,7 @@ async def ask(
             logger.warning("Falling back to keyword-only retrieval: %s", exc)
 
     rel = index.relevance(question, vector)
-    if not answering.should_answer(rel):
+    if answering.looks_like_injection(question) or not answering.should_answer(rel):
         logger.info(
             "Off-topic question refused (coverage=%.2f lex=%.2f dense=%.2f unknown=%s): %r",
             rel.coverage, rel.lexical, rel.dense, rel.unknown[:5], question[:120],
@@ -139,7 +139,15 @@ async def ask(
         return AskResponse(answer=result.text, sources=[], answered=False, remaining=remaining)
 
     hits = index.search(question, vector, k=8)
-    result = await answering.answer(question, hits, lang, payload.screen)
+    try:
+        result = await answering.answer(question, hits, lang, payload.screen)
+    except answering.AnswerError as exc:
+        # The reason belongs in the log, not in a reader's face.
+        logger.error("Answering failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="The assistant is unavailable right now. Please try again shortly.",
+        ) from exc
 
     return AskResponse(
         answer=result.text,
@@ -194,6 +202,58 @@ async def models(_: Annotated[TokenData, Depends(get_current_admin)]):
         "chosen": await embeddings.resolve_model() if usable else None,
         "configured_override": settings.GEMINI_EMBED_MODEL,
     }
+
+
+@router.get("/diagnose", summary="Try the whole chain and report what broke (admin)")
+async def diagnose(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
+    _: Annotated[TokenData, Depends(get_current_admin)],
+):
+    """Exercise retrieval, embedding and answering, and say what each one did.
+
+    The friendly message a reader gets when something breaks is no use for
+    fixing it, so the real errors are reported here instead of only in the log.
+    """
+    report: dict[str, object] = {}
+
+    index = await store.load(db)
+    report["index"] = (
+        {"passages": len(index.passages), "semantic_search": index.has_vectors}
+        if index else "empty"
+    )
+
+    try:
+        report["embedding_model"] = await embeddings.resolve_model()
+        vector = await embeddings.embed_query("kitchen in the south east")
+        report["embed_query"] = f"ok, {len(vector)} dimensions"
+    except Exception as exc:  # noqa: BLE001 — reporting is the point
+        report["embed_query"] = f"FAILED: {exc}"
+
+    try:
+        report["answering_models"] = (await answering.list_models())[:20]
+        report["answering_model"] = await answering.resolve_model()
+    except Exception as exc:  # noqa: BLE001
+        report["answering_model"] = f"FAILED: {exc}"
+
+    if index:
+        rel = index.relevance("where should the kitchen go", None)
+        report["relevance_keyword_only"] = {
+            "coverage": round(rel.coverage, 2),
+            "lexical": round(rel.lexical, 2),
+            "would_answer": answering.should_answer(rel),
+        }
+        try:
+            hits = index.search("where should the kitchen go", None, k=4)
+            answer = await answering.answer("Where should the kitchen go?", hits, "en")
+            report["end_to_end"] = {
+                "answered": answer.answered,
+                "sources": len(answer.sources),
+                "preview": answer.text[:200],
+            }
+        except Exception as exc:  # noqa: BLE001
+            report["end_to_end"] = f"FAILED: {exc}"
+
+    return report
 
 
 @router.get("/status", summary="What the assistant currently knows (admin)")

@@ -22,53 +22,165 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from app.services.ai import lexicon
 from app.services.ai.corpus import Passage
+from app.services.ai.lexicon import stem
 
 #: Words that match everything and therefore distinguish nothing.
+#:
+#: The Hinglish and Bengali function words are here for a reason. Questions
+#: arrive as "rasoi ghar kon dishe hobe", and the Pitra Kripa chapters are
+#: written in the same romanised register — so "ghar", "kon" and "ki" matched
+#: those chapters strongly and buried the kitchen passage the question was
+#: actually about.
 STOP = {
-    "a", "an", "and", "are", "as", "at", "be", "but", "by", "can", "do", "does",
-    "for", "from", "has", "have", "how", "i", "if", "in", "is", "it", "its", "my",
-    "of", "on", "or", "should", "that", "the", "their", "then", "there", "these",
-    "this", "to", "was", "what", "when", "where", "which", "will", "with", "you",
-    "your",
-}
-
-#: The compass words a question is likely to use, and the code the corpus uses.
-#: Without this, "north east" never finds a passage that only says "NE".
-DIRECTION_WORDS: dict[str, str] = {
-    "north": "N", "south": "S", "east": "E", "west": "W",
-    "northeast": "NE", "north-east": "NE", "ishan": "NE", "ishanya": "NE",
-    "southeast": "SE", "south-east": "SE", "agni": "SE", "agneya": "SE",
-    "southwest": "SW", "south-west": "SW", "nairutya": "SW", "nairitya": "SW",
-    "northwest": "NW", "north-west": "NW", "vayavya": "NW", "vayu": "NW",
-    "centre": "BRAHMASTHAN", "center": "BRAHMASTHAN", "brahmasthan": "BRAHMASTHAN",
+    # English
+    "a", "an", "and", "any", "are", "as", "at", "be", "been", "but", "by",
+    "can", "did", "do", "does", "for", "from", "get", "give", "go", "goes",
+    "had", "has", "have", "he", "her", "him", "his", "how", "i", "if", "in",
+    "into", "is", "it", "its", "just", "know", "me", "much", "must", "my",
+    "need", "of", "on", "one", "or", "our", "out", "please", "say", "she",
+    "should", "so", "some", "suit", "suits", "tell", "than", "that", "the",
+    "their", "them", "then", "there", "these", "they", "this", "to", "too",
+    "us", "very", "want", "was", "we", "were", "what", "when", "where",
+    "which", "while", "who", "why", "will", "with", "would", "you", "your",
+    # Romanised Hindi / Bengali function words
+    # "e" is missing on purpose: it is the East zone's code.
+    "aar", "ache", "achhe", "ar", "aur", "bhai", "chahiye", "ei", "eita",
+    "er", "eta", "ghar", "hai",
+    "hain", "hobe", "hoy", "hota", "hoti", "honi", "hona", "jodi", "ka",
+    "kahan", "kaise", "ke", "keno", "ki", "kina", "ko", "kon", "kona",
+    "konta", "kothay", "koto", "kya", "me", "mein", "na", "nahi", "par",
+    "ta", "tha", "the", "to", "uchit", "ye", "yeh",
+    # Verbs and vague nouns that carry no subject. Left in, a short question
+    # like "tarpan ka mahatva" scored half its words unknown and was refused
+    # for a word that was never the point.
+    "bhalo", "bolo", "bujhte", "chai", "dorkar", "ghore", "janai", "jane",
+    "jante", "jonno", "jonne", "kharap", "kore", "korte", "kori", "lagbe",
+    "mahatva", "moto", "niye", "rakha", "rakhbo", "rakhe", "rakhna", "rakhte",
+    "thake", "bare", "bishoy", "somporke", "kotha", "katha", "oi", "ota",
+    "tai", "tao", "eto", "ebong", "kintu", "thakbe", "thakbo", "korbo",
+    "korbe", "dao", "dibo", "debo", "pabo", "bolo", "bol", "koro",
 }
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 
 
-def tokenize(text: str) -> list[str]:
-    """Lower-case words, stop words dropped, compass words expanded.
+def _words(text: str) -> list[str]:
+    return _TOKEN.findall(text.lower())
 
-    "North-East" arrives as two tokens once split, so the compound forms are
-    rejoined before lookup; otherwise "north east kitchen" would never reach NE.
+
+def tokenize(text: str) -> list[str]:
+    """Turn text into the terms the index is built and searched on.
+
+    Four things happen, and the order matters:
+
+    1. Phrases first. "north east", "washing machine" and "air conditioner"
+       each mean one thing, and matching them word by word loses that — so the
+       longest phrase in the lexicon is tried at each position before single
+       words are.
+    2. Compass words become the codes the corpus uses, because the corpus
+       writes zones as NE and SSW and a reader writes them out.
+    3. A reader's word brings the corpus's words with it: "fridge" also
+       searches "refrigerator". Both are kept, so the reader's own word still
+       matches where the corpus happens to use it too.
+    4. Everything is stemmed, so "colours", "colour" and "coloured" are one
+       term. Direction codes are too short to be stemmed and are left alone.
+
+    Applied to both sides — the passages at index time and the question at
+    search time — so the two always meet in the same vocabulary.
     """
-    words = _TOKEN.findall(text.lower())
+    words = _words(text)
     out: list[str] = []
     i = 0
     while i < len(words):
-        pair = f"{words[i]}{words[i + 1]}" if i + 1 < len(words) else ""
-        if pair in DIRECTION_WORDS:
-            out.append(DIRECTION_WORDS[pair].lower())
-            out.append(pair)
-            i += 2
+        matched = False
+        # Longest phrase first, so "north north east" beats "north east".
+        for span in range(min(lexicon.MAX_PHRASE, len(words) - i), 0, -1):
+            phrase = " ".join(words[i:i + span])
+            joined = "".join(words[i:i + span])
+
+            code = lexicon.DIRECTIONS.get(phrase) or (
+                lexicon.DIRECTIONS.get(joined) if span > 1 else None
+            )
+            if code:
+                # The code alone, deliberately. Emitting "southwest" as well
+                # meant a heading reading "SOUTH-WEST — SW" matched a direction
+                # twice while one reading "SW" matched it once, so every zone
+                # heading outranked the colour chart on questions about colour.
+                out.append(code)
+                i += span
+                matched = True
+                break
+
+            if aliases := lexicon.ALIASES.get(phrase):
+                out.extend(stem(a) for a in _expand(aliases))
+                if span == 1:
+                    out.append(stem(phrase))
+                i += span
+                matched = True
+                break
+
+        if matched:
             continue
+
         w = words[i]
-        if w in DIRECTION_WORDS:
-            out.append(DIRECTION_WORDS[w].lower())
         if w not in STOP:
-            out.append(w)
+            out.append(stem(w))
         i += 1
+
+    return out
+
+
+def understood(text: str, vocab: set[str]) -> tuple[float, list[str]]:
+    """What share of a question's words the app can make sense of.
+
+    A word counts as understood if the corpus uses it, or if the lexicon knows
+    what it means. That second half matters: "sirhi kahan honi chahiye" was
+    refused because "sirhi" is not a word the corpus contains — even though the
+    lexicon maps it to staircase and the search found the right passage.
+    Understanding a word is not the same as having seen it.
+    """
+    words = _words(text)
+    content = [w for w in words if w not in STOP]
+    if not content:
+        return 0.0, []
+
+    known: list[bool] = []
+    unknown: list[str] = []
+    i = 0
+    while i < len(content):
+        hit = False
+        for span in range(min(lexicon.MAX_PHRASE, len(content) - i), 0, -1):
+            phrase = " ".join(content[i:i + span])
+            joined = "".join(content[i:i + span])
+            if (
+                phrase in lexicon.DIRECTIONS
+                or joined in lexicon.DIRECTIONS
+                or phrase in lexicon.ALIASES
+            ):
+                known.extend([True] * span)
+                i += span
+                hit = True
+                break
+        if hit:
+            continue
+        word = content[i]
+        seen = stem(word) in vocab
+        known.append(seen)
+        if not seen:
+            unknown.append(word)
+        i += 1
+
+    return sum(known) / len(known), unknown
+
+
+def _expand(aliases: tuple[str, ...]) -> list[str]:
+    """An alias may itself be a phrase; index its words, not the phrase."""
+    out: list[str] = []
+    for alias in aliases:
+        parts = _words(alias)
+        out.extend(p for p in parts if p not in STOP)
     return out
 
 
@@ -86,10 +198,66 @@ class Relevance:
     coverage: float
     #: Best BM25 score against any one passage.
     lexical: float
+    #: Best BM25 score against any one passage's heading trail.
+    #:
+    #: A question about something the app covers names it, and the app names it
+    #: in a heading. A question built from ordinary words the corpus happens to
+    #: contain — "how to lose weight fast" — matches only in bodies.
+    heading: float
     #: Best cosine similarity against any one passage; 0 without a vector.
     dense: float
     #: The question's words the corpus has never heard of.
     unknown: list[str]
+
+
+def _idf(docs: list[list[str]]) -> dict[str, float]:
+    """How much each term narrows things down, over the whole corpus.
+
+    Computed once across heading and body together, and shared by both fields.
+    Per-field idf was wrong in a way that took a while to see: "placement" is
+    everywhere in the bodies but in only a few headings, so the heading field
+    scored it as rare and one passage titled "Step-by-Step Placement Protocol"
+    won every question containing the word "placement". A term's importance is
+    a property of the corpus, not of the field it was found in.
+    """
+    df: Counter[str] = Counter()
+    for d in docs:
+        df.update(set(d))
+    n = len(docs) or 1
+    # Floored: a term in almost every passage must not be able to push a score
+    # negative and bury a passage that genuinely matches.
+    return {
+        term: max(0.05, math.log(1 + (n - freq + 0.5) / (freq + 0.5)))
+        for term, freq in df.items()
+    }
+
+
+class _Field:
+    """One searchable field of the corpus, with its own length statistics.
+
+    Its own lengths, because a heading is a handful of words and a body can be
+    hundreds, and BM25 divides by length. A shared idf, for the reason above.
+    """
+
+    def __init__(self, docs: list[list[str]], idf: dict[str, float]):
+        self.tf: list[Counter[str]] = [Counter(d) for d in docs]
+        self.lengths = np.array([len(d) or 1 for d in docs], dtype=np.float32)
+        self.avg_len = float(self.lengths.mean()) if len(self.lengths) else 1.0
+        self.idf = idf
+
+    def score(self, terms: list[str], k1: float = 1.5, b: float = 0.75) -> np.ndarray:
+        scores = np.zeros(len(self.tf), dtype=np.float32)
+        for term in set(terms):
+            idf = self.idf.get(term)
+            if idf is None:
+                continue
+            for i, tf in enumerate(self.tf):
+                f = tf.get(term)
+                if not f:
+                    continue
+                norm = f * (k1 + 1) / (f + k1 * (1 - b + b * self.lengths[i] / self.avg_len))
+                scores[i] += idf * norm
+        return scores
 
 
 class Index:
@@ -106,36 +274,42 @@ class Index:
 
     # --- keyword half (BM25) ---------------------------------------------
 
+    #: How much a heading match counts against a body match.
+    #:
+    #: The heading trail is what says what a passage is *about*: "16 Zone
+    #: Analysis — Kitchen — 7. SE". The body is what it says. Asked "kitchen in
+    #: the south east", a Toilet passage that mentions kitchen in passing beats
+    #: the Kitchen passage on body text alone — it is longer and says more — so
+    #: the field that names the subject has to outweigh the one that discusses
+    #: it.
+    #:
+    #: Two fields scored separately rather than one bag with the heading
+    #: repeated: BM25 divides by document length, and padding a document with
+    #: three copies of its own title distorts that for every other term in it.
+    HEADING_WEIGHT = 2.5
+
     def _build_lexical(self) -> None:
-        self.docs = [tokenize(p.for_embedding()) for p in self.passages]
-        self.lengths = np.array([len(d) or 1 for d in self.docs], dtype=np.float32)
-        self.avg_len = float(self.lengths.mean()) if len(self.lengths) else 1.0
-        self.tf: list[Counter[str]] = [Counter(d) for d in self.docs]
+        heads = [tokenize(p.heading) for p in self.passages]
+        bodies = [tokenize(p.text) for p in self.passages]
+        self.idf = _idf([h + b for h, b in zip(heads, bodies, strict=True)])
+        self.head = _Field(heads, self.idf)
+        self.body = _Field(bodies, self.idf)
+        # The whole passage, for the relevance gate.
+        self.tf = [h + b for h, b in zip(self.head.tf, self.body.tf, strict=True)]
 
-        df: Counter[str] = Counter()
-        for d in self.docs:
-            df.update(set(d))
-        n = len(self.docs) or 1
-        # BM25's idf, floored: a term in almost every passage must not be able
-        # to push a score negative and bury a passage that genuinely matches.
-        self.idf = {
-            term: max(0.05, math.log(1 + (n - freq + 0.5) / (freq + 0.5)))
-            for term, freq in df.items()
-        }
+    def _bm25(self, terms: list[str]) -> np.ndarray:
+        """Both fields, the heading weighted above the body."""
+        return self.body.score(terms) + self.HEADING_WEIGHT * self.head.score(terms)
 
-    def _bm25(self, terms: list[str], k1: float = 1.5, b: float = 0.75) -> np.ndarray:
-        scores = np.zeros(len(self.passages), dtype=np.float32)
-        for term in set(terms):
-            idf = self.idf.get(term)
-            if idf is None:
-                continue
-            for i, tf in enumerate(self.tf):
-                f = tf.get(term)
-                if not f:
-                    continue
-                norm = f * (k1 + 1) / (f + k1 * (1 - b + b * self.lengths[i] / self.avg_len))
-                scores[i] += idf * norm
-        return scores
+    def _overlap(self, terms: list[str]) -> np.ndarray:
+        """The share of the question's distinct terms present in each passage."""
+        wanted = set(terms)
+        if not wanted:
+            return np.zeros(len(self.passages), dtype=np.float32)
+        return np.array(
+            [len(wanted & set(tf)) / len(wanted) for tf in self.tf],
+            dtype=np.float32,
+        )
 
     # --- vector half ------------------------------------------------------
 
@@ -202,12 +376,14 @@ class Index:
         the words it does not share are exactly the ones carrying its meaning.
         """
         terms = tokenize(question)
-        known = [t for t in terms if t in self.idf]
+        coverage, unknown = understood(question, set(self.idf))
         lexical = self._bm25(terms)
+        heading = self.head.score(terms)
         dense = self._cosine(query_vector) if query_vector else np.zeros_like(lexical)
         return Relevance(
-            coverage=len(known) / len(terms) if terms else 0.0,
+            coverage=coverage,
             lexical=float(lexical.max()) if len(lexical) else 0.0,
+            heading=float(heading.max()) if len(heading) else 0.0,
             dense=float(dense.max()) if len(dense) else 0.0,
-            unknown=[t for t in terms if t not in self.idf],
+            unknown=unknown,
         )

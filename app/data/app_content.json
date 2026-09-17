@@ -5457,7 +5457,7 @@
    "Vastu Colour Spectrum",
    "N — Career & Wealth Opportunities"
   ],
-  "text": "theme: Career & Wealth Opportunities,\nelement: Water Element · North Quadrant,\nself:\nBlue,\nSky Blue,\nCyan\n,\nenhance:\nWhite,\nOff-white,\nSilver\n,\navoid:\nRed,\nOrange,\nDark Pink,\nBright Yellow"
+  "text": "Vastu colours for the N zone, whose theme is Career & Wealth Opportunities.\nElement and quadrant: Water Element · North Quadrant.\nThe zone's own colours: Blue, Sky Blue, Cyan.\nColours that enhance this zone: White, Off-white, Silver.\nColours to avoid in this zone: Red, Orange, Dark Pink, Bright Yellow."
  },
  {
   "id": "colour:NNE",
@@ -5467,7 +5467,7 @@
    "Vastu Colour Spectrum",
    "NNE — Health & Immunity"
   ],
-  "text": "theme: Health & Immunity,\nelement: Water Element · North Quadrant,\nself:\nLight Blue,\nAquamarine\n,\nenhance:\nWhite,\nLight Green\n,\navoid:\nFire Red,\nDark Orange"
+  "text": "Vastu colours for the NNE zone, whose theme is Health & Immunity.\nElement and quadrant: Water Element · North Quadrant.\nThe zone's own colours: Light Blue, Aquamarine.\nColours that enhance this zone: White, Light Green.\nColours to avoid in this zone: Fire Red, Dark Orange."
  },
  {
   "id": "colour:NE",
@@ -5477,7 +5477,7 @@
    "Vastu Colour Spectrum",
    "NE — Clarity & Wisdom"
   ],
-  "text": "theme: Clarity & Wisdom,\nelement: Water Element · North Quadrant,\nself:\nIce Blue,\nOff-White\n,\nenhance:\nPure White,\nCream\n,\navoid:\nBlood Red,\nJet Black,\nDark Yellow"
+  "text": "Vastu colours for the NE zone, whose theme is Clarity & Wisdom.\nElement and quadrant: Water Element · North Quadrant.\nThe zone's own colours: Ice Blue, Off-White.\nColours that enhance this zone: Pure White, Cream.\nColours to avoid in this zone: Blood Red, Jet Black, Dark Yellow."
  },
  {
   "id": "colour:ENE",
@@ -5487,7 +5487,7 @@
    "Vastu Colour Spectrum",
    "ENE — Fun & Refreshment"
   ],
-  "text": "theme: Fun & Refreshment,\nelement: Air / Wood Element · East Quadrant,\nself:\nMint Green,\nLight Olive\n,\nenhance:\nLight Blue,\nAqua\n,\navoid:\nDark Red,\nMetallic Grey,\nSilver"
+  "text": "Vastu colours for the ENE zone, whose theme is Fun & Refreshment.\nElement and quadrant: Air / Wood Element · East Quadrant.\nThe zone's own colours: Mint Green, Light Olive.\nColours that enhance this zone: Light Blue, Aqua.\nColours to avoid in this zone: Dark Red, Metallic Grey, Silver."
  },
  {
   "id": "colour:E",
@@ -5497,7 +5497,7 @@
    "Vastu Colour Spectrum",
    "E — Social Connectivity"
   ],
-  "text": "theme: Social Connectivity,\nelement: Air / Wood Element · East Quadrant,\nself:\nLeaf Green,\nSage Green\n,\nenhance:\nLight Blue,\nTan Brown\n,\navoid:\nScarlet Red,\nGolden Yellow,\nPitch Black"
+  "text": "Vastu colours for the E zone, whose theme is Social Connectivity.\nElement and quadrant: Air / Wood Element · East Quadrant.\nThe zone's own colours: Leaf Green, Sage Green.\nColours that enhance this zone: Light Blue, Tan Brown.\nColours to avoid in this zone: Scarlet Red, Golden Yellow, Pitch Black."
  },
  {
   "id": "colour:ESE",
@@ -5507,7 +5507,7 @@
    "Vastu Colour Spectrum",
    "ESE — Anxiety & Churning"
   ],
-  "text": "theme: Anxiety & Churning,\nelement: Air / Wood Element · East Quadrant,\nself:\nOlive Green,\nKhaki\n,\nenhance:\nChocolate Brown,\nBeige\n,\navoid:\nFire Red,\nBright Orange,\nMetallic White"
+  "text": "Vastu colours for the ESE zone, whose theme is Anxiety & Churning.\nElement and quadrant: Air / Wood Element · East Quadrant.\nThe zone's own colours: Olive Green, Khaki.\nColours that enhance this zone: Chocolate Brown, Beige.\nColours to avoid in this zone: Fire Red, Bright Orange, Metallic White."
  },
  {
   "id": "colour:SE",
@@ -5517,7 +5517,7 @@
    "Vastu Colour Spectrum",
    "SE — Cash & Liquidity"
   ],
-  "text": "theme: Cash & Liquidity,\nelement: Fire Element · South Quadrant,\nself:\nRed,\nCoral,\nWarm Pink\n,\nenhance:\nLight Green,\nEmerald\n,\navoid:\nOcean Blue,\nDark Grey,\nBlack"
+  "text": "Vastu colours for the SE zone, whose theme is Cash & Liquidity.\nElement and quadrant: Fire Element · South Quadrant.\nThe zone's own colours: Red, Coral, Warm Pink.\nColours that enhance this zone: Light Green, Emerald.\nColours to avoid in this zone: Ocean Blue, Dark Grey, Black."
  },
  {
   "id": "colour:SSE",
@@ -5527,7 +5527,7 @@
    "Vastu Colour Spectrum",
    "SSE — Power & Confidence"
   ],
-  "text": "theme: Power & Confidence,\nelement: Fire Element · South Quadrant,\nself:\nTerracotta,\nPeach\n,\nenhance:\nLight Green,\nLight Wood Tones\n,\navoid:\nDeep Navy Blue,\nPitch Black"
+  "text": "Vastu colours for the SSE zone, whose theme is Power & Confidence.\nElement and quadrant: Fire Element · South Quadrant.\nThe zone's own colours: Terracotta, Peach.\nColours that enhance this zone: Light Green, Light Wood Tones.\nColours to avoid in this zone: Deep Navy Blue, Pitch Black."
  },
  {
   "id": "colour:S",
@@ -5537,7 +5537,7 @@
    "Vastu Colour Spectrum",
    "S — Fame & Relaxation"
   ],
-  "text": "theme: Fame & Relaxation,\nelement: Fire Element · South Quadrant,\nself:\nDark Maroon,\nMagenta,\nDeep Red\n,\nenhance:\nLight Green,\nSoft Pink\n,\navoid:\nRoyal Blue,\nJet Black,\nSteel Grey"
+  "text": "Vastu colours for the S zone, whose theme is Fame & Relaxation.\nElement and quadrant: Fire Element · South Quadrant.\nThe zone's own colours: Dark Maroon, Magenta, Deep Red.\nColours that enhance this zone: Light Green, Soft Pink.\nColours to avoid in this zone: Royal Blue, Jet Black, Steel Grey."
  },
  {
   "id": "colour:SSW",
@@ -5547,7 +5547,7 @@
    "Vastu Colour Spectrum",
    "SSW — Disposal & Expenditure"
   ],
-  "text": "theme: Disposal & Expenditure,\nelement: Earth Element · South-West Quadrant,\nself:\nMustard Yellow,\nMud Brown\n,\nenhance:\nTerracotta Red,\nLight Pink\n,\navoid:\nForest Green,\nOcean Blue,\nPure White"
+  "text": "Vastu colours for the SSW zone, whose theme is Disposal & Expenditure.\nElement and quadrant: Earth Element · South-West Quadrant.\nThe zone's own colours: Mustard Yellow, Mud Brown.\nColours that enhance this zone: Terracotta Red, Light Pink.\nColours to avoid in this zone: Forest Green, Ocean Blue, Pure White."
  },
  {
   "id": "colour:SW",
@@ -5557,7 +5557,7 @@
    "Vastu Colour Spectrum",
    "SW — Stability & Relationships"
   ],
-  "text": "theme: Stability & Relationships,\nelement: Earth Element · South-West Quadrant,\nself:\nGolden Yellow,\nEarthy Brown,\nOchre\n,\nenhance:\nPeach,\nCoral Pink\n,\navoid:\nLeaf Green,\nSky Blue,\nDark Black"
+  "text": "Vastu colours for the SW zone, whose theme is Stability & Relationships.\nElement and quadrant: Earth Element · South-West Quadrant.\nThe zone's own colours: Golden Yellow, Earthy Brown, Ochre.\nColours that enhance this zone: Peach, Coral Pink.\nColours to avoid in this zone: Leaf Green, Sky Blue, Dark Black."
  },
  {
   "id": "colour:WSW",
@@ -5567,7 +5567,7 @@
    "Vastu Colour Spectrum",
    "WSW — Savings & Studies"
   ],
-  "text": "theme: Savings & Studies,\nelement: Space / Metal Element · West Quadrant,\nself:\nMatte White,\nCream,\nPastel Yellow\n,\nenhance:\nEarthy Yellow,\nOchre\n,\navoid:\nDeep Green,\nCrimson Red,\nNavy Blue"
+  "text": "Vastu colours for the WSW zone, whose theme is Savings & Studies.\nElement and quadrant: Space / Metal Element · West Quadrant.\nThe zone's own colours: Matte White, Cream, Pastel Yellow.\nColours that enhance this zone: Earthy Yellow, Ochre.\nColours to avoid in this zone: Deep Green, Crimson Red, Navy Blue."
  },
  {
   "id": "colour:W",
@@ -5577,7 +5577,7 @@
    "Vastu Colour Spectrum",
    "W — Gains & Profits"
   ],
-  "text": "theme: Gains & Profits,\nelement: Space / Metal Element · West Quadrant,\nself:\nWhite,\nCharcoal Grey,\nAsh Grey\n,\nenhance:\nSilver,\nPale Yellow,\nGold\n,\navoid:\nBright Green,\nFiery Red"
+  "text": "Vastu colours for the W zone, whose theme is Gains & Profits.\nElement and quadrant: Space / Metal Element · West Quadrant.\nThe zone's own colours: White, Charcoal Grey, Ash Grey.\nColours that enhance this zone: Silver, Pale Yellow, Gold.\nColours to avoid in this zone: Bright Green, Fiery Red."
  },
  {
   "id": "colour:WNW",
@@ -5587,7 +5587,7 @@
    "Vastu Colour Spectrum",
    "WNW — Detoxification & Depression Control"
   ],
-  "text": "theme: Detoxification & Depression Control,\nelement: Space / Metal Element · North-West Quadrant,\nself:\nOff-White,\nPearl Grey\n,\nenhance:\nMetallic Silver,\nIvory\n,\navoid:\nEmerald Green,\nRuby Red,\nNeon Orange"
+  "text": "Vastu colours for the WNW zone, whose theme is Detoxification & Depression Control.\nElement and quadrant: Space / Metal Element · North-West Quadrant.\nThe zone's own colours: Off-White, Pearl Grey.\nColours that enhance this zone: Metallic Silver, Ivory.\nColours to avoid in this zone: Emerald Green, Ruby Red, Neon Orange."
  },
  {
   "id": "colour:NW",
@@ -5597,7 +5597,7 @@
    "Vastu Colour Spectrum",
    "NW — Support & Banking"
   ],
-  "text": "theme: Support & Banking,\nelement: Space / Metal Element · North-West Quadrant,\nself:\nPearl Cream,\nLight Metallic Grey\n,\nenhance:\nSoft Yellow,\nBeige\n,\navoid:\nDeep Scarlet Red,\nNavy Blue,\nBlack"
+  "text": "Vastu colours for the NW zone, whose theme is Support & Banking.\nElement and quadrant: Space / Metal Element · North-West Quadrant.\nThe zone's own colours: Pearl Cream, Light Metallic Grey.\nColours that enhance this zone: Soft Yellow, Beige.\nColours to avoid in this zone: Deep Scarlet Red, Navy Blue, Black."
  },
  {
   "id": "colour:NNW",
@@ -5607,7 +5607,7 @@
    "Vastu Colour Spectrum",
    "NNW — Attraction & Relationship Joy"
   ],
-  "text": "theme: Attraction & Relationship Joy,\nelement: Space / Metal Element · North-West Quadrant,\nself:\nLight Blue,\nOff-White\n,\nenhance:\nMetallic Silver,\nBright White\n,\navoid:\nDark Chrome Yellow,\nFiery Red"
+  "text": "Vastu colours for the NNW zone, whose theme is Attraction & Relationship Joy.\nElement and quadrant: Space / Metal Element · North-West Quadrant.\nThe zone's own colours: Light Blue, Off-White.\nColours that enhance this zone: Metallic Silver, Bright White.\nColours to avoid in this zone: Dark Chrome Yellow, Fiery Red."
  },
  {
   "id": "colour:brahmasthan",
@@ -5617,7 +5617,7 @@
    "Vastu Colour Spectrum",
    "Brahmasthan — Center of the Property"
   ],
-  "text": "theme: Center of the Property,\nelement: The Cosmic Center,\nself:\nPure White,\nSoft Cream,\nWarm Ivory\n,\nenhance:\nTranslucent,\nultra-light pastels\n,\navoid:\nHeavy Red,\nPitch Black,\nDark Blue,\nCharcoal Brown"
+  "text": "Vastu colours for the Brahmasthan (the centre) zone, whose theme is Center of the Property.\nElement and quadrant: The Cosmic Center.\nThe zone's own colours: Pure White, Soft Cream, Warm Ivory.\nColours that enhance this zone: Translucent, ultra-light pastels.\nColours to avoid in this zone: Heavy Red, Pitch Black, Dark Blue, Charcoal Brown."
  },
  {
   "id": "colour-note:0",
