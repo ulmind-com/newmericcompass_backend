@@ -167,8 +167,11 @@ never write "according to [3]" or "as passage 4 says". The bracketed numbers \
 are the only reference the reader needs. When you attribute guidance, attribute \
 it to Acharya Pannkaj Kabiraj or to Vastu, or simply state it.
 
-If the teachings are not about what was asked, reply with exactly: \
-INSUFFICIENT_CONTEXT"""
+If the teachings do not answer what was asked, begin your reply with the \
+marker NOT_COVERED on its own line, then write one or two kind sentences in \
+{language} saying that Acharya's teachings here do not cover that particular \
+point, and suggesting a related Vastu question they could ask instead. Do not \
+answer the question from anywhere else."""
 
 #: Deciding what a message is, before deciding how to answer it.
 ROUTER = IDENTITY + """
@@ -178,7 +181,7 @@ written — any language, any spelling, typos, stretched words like "hiiii", \
 Bengali or Hindi typed in English letters, emoji.
 
 Reply with JSON only, no other text:
-{{"intent": "vastu" | "chat" | "off_topic", "reply": "..."}}
+{{"intent": "vastu" | "chat" | "off_topic", "reply": "...", "question": "..."}}
 
 - "vastu": the message asks about Vastu or anything you help with — a room, an \
 object and where it should go, a direction or zone, colours for a space, a \
@@ -194,24 +197,28 @@ maths, jokes, general knowledge, medical questions, other subjects. Write one \
 or two kind sentences saying you only help with Vastu, and invite a Vastu \
 question. Never answer the off-topic question itself, not even partly.
 
-Write "reply" in {language}, in its own script. Keep it short — a phone screen."""
+Write "reply" in {language}, in its own script. Keep it short — a phone screen.
+
+For intent "vastu", "question" is what will be searched for in Acharya's \
+teachings, so write it the way those teachings are written: one complete, \
+plain English question. Translate from any language or romanised spelling, \
+name things by their ordinary English names, and spell directions out in full \
+— "almari kon dike rakhbo" becomes "Which direction should the wardrobe be \
+placed in?", "rasoi ghar uttor purbe" becomes "Is a kitchen in the North-East \
+good?", "fridge" becomes "refrigerator". Keep Vastu terms such as \
+Brahmasthan, Pitra Dosh and pada names as they are. For "chat" and \
+"off_topic", leave "question" empty."""
 
 #: Added to the router when there is a conversation to read.
 ROUTER_WITH_HISTORY = """
 
 The conversation so far comes before the latest message. Use it to understand \
 what the latest message refers to: "what is the remedy for it?", "and the \
-bedroom?", "why?", "explain more" all depend on what was said before.
-
-Add a third field to the JSON:
-{{"intent": ..., "reply": ..., "question": "..."}}
-
-For intent "vastu", "question" is the latest message rewritten as one \
-complete question in English that makes sense on its own, with everything it \
-refers to spelled out. "what is the remedy for it?" after a message about a \
-toilet in the north-east becomes "What is the remedy for a toilet in the \
-North-East?". If the latest message already stands on its own, translate it \
-to English as it is. For "chat" and "off_topic", leave "question" empty."""
+bedroom?", "why?", "explain more" all depend on what was said before. The \
+"question" you write must spell out everything it refers to, so that it makes \
+sense on its own: "what is the remedy for it?" after a message about a toilet \
+in the north-east becomes "What is the remedy for a toilet in the \
+North-East?"."""
 
 
 REFUSAL = {
@@ -521,8 +528,19 @@ async def answer(question: str, hits: list[Hit], lang: str, screen: str | None =
 
     text = await ask_model(question, hits, lang, screen)
 
-    if not text or "INSUFFICIENT_CONTEXT" in text:
+    # Not covered: the model says so itself, in the reader's language. The
+    # fixed refusal is only the fallback for when it says nothing usable.
+    if not text:
         return refusal(lang)
+    for marker in ("NOT_COVERED", "INSUFFICIENT_CONTEXT"):
+        if marker in text:
+            said = text.split(marker, 1)[1].strip(" :\n")
+            # A "not covered" note must not smuggle in an answer: anything
+            # carrying citations or running long is not the note that was asked
+            # for, so the fallback is used instead.
+            if said and len(said) < 400 and not _CITE.search(said):
+                return Answer(text=said, sources=[], answered=False)
+            return refusal(lang)
 
     # Every number the answer cited, kept only if it was really sent.
     text, cited = _citations(text)
