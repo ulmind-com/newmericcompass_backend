@@ -124,14 +124,17 @@ async def ask(
 
     lang = payload.lang if payload.lang in LANGS else "en"
     question = payload.question.strip()
-
-    # A greeting is answered with a welcome, not searched for and refused, and
-    # it does not count against any allowance.
-    if answering.is_greeting(question):
-        hello = answering.welcome(lang)
-        return AskResponse(answer=hello.text, sources=[], answered=True, remaining=None)
-
     remaining = await _spend(db, _caller(authorization, x_device_id, request))
+
+    unavailable = HTTPException(
+        status_code=503,
+        detail="The assistant is unavailable right now. Please try again shortly.",
+    )
+
+    # Attempts to talk the assistant out of being the assistant are refused
+    # before anything else sees them.
+    if answering.looks_like_injection(question):
+        return _reply(answering.refusal(lang), remaining)
 
     # A question the embedding service cannot handle is still answerable from
     # the keyword half, so a Gemini outage degrades the assistant rather than
@@ -143,14 +146,35 @@ async def ask(
         except embeddings.EmbeddingError as exc:
             logger.warning("Falling back to keyword-only retrieval: %s", exc)
 
+    # Two ways in. A message the keyword gate is sure about is a Vastu question
+    # and goes straight to the search — the common case, one model call. Anything
+    # the gate is unsure of — "hiiii", "tumi ke", "what's your name", a Vastu
+    # question phrased in a way the gate does not recognise — goes to the model
+    # to decide what it is. Nothing about greetings or small talk is listed
+    # here: the model reads the message the way a person would.
     rel = index.relevance(question, vector)
-    if answering.looks_like_injection(question) or not answering.should_answer(rel):
+    confident = answering.should_answer(rel)
+
+    if not confident:
+        try:
+            decision = await answering.route(question, lang)
+        except answering.AnswerError as exc:
+            logger.error("Routing failed: %s", exc)
+            raise unavailable from exc
+
         logger.info(
-            "Off-topic question refused (coverage=%.2f lex=%.2f dense=%.2f unknown=%s): %r",
-            rel.coverage, rel.lexical, rel.dense, rel.unknown[:5], question[:120],
+            "Routed %r as %s (coverage=%.2f heading_terms=%d)",
+            question[:80], decision.intent, rel.coverage, rel.heading_terms,
         )
-        result = answering.refusal(lang)
-        return AskResponse(answer=result.text, sources=[], answered=False, remaining=remaining)
+        if decision.intent == "chat":
+            return _reply(answering.Answer(decision.reply, [], True), remaining)
+        if decision.intent == "off_topic":
+            text = decision.reply or answering.refusal(lang).text
+            return _reply(answering.Answer(text, [], False), remaining)
+        # "vastu": a real question the gate did not recognise. It is answered
+        # exactly like any other — from the passages, with citations checked —
+        # so the model's call here decides that an answer is attempted, never
+        # what the answer says.
 
     hits = index.search(question, vector, k=8)
     try:
@@ -158,11 +182,12 @@ async def ask(
     except answering.AnswerError as exc:
         # The reason belongs in the log, not in a reader's face.
         logger.error("Answering failed: %s", exc)
-        raise HTTPException(
-            status_code=503,
-            detail="The assistant is unavailable right now. Please try again shortly.",
-        ) from exc
+        raise unavailable from exc
 
+    return _reply(result, remaining)
+
+
+def _reply(result: answering.Answer, remaining: Optional[int]) -> AskResponse:
     return AskResponse(
         answer=result.text,
         sources=[SourceOut(**asdict(s)) for s in result.sources],

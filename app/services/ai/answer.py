@@ -17,6 +17,7 @@ answering a question about the weather from a Vastu corpus if it is never asked.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -116,9 +117,26 @@ def looks_like_injection(question: str) -> bool:
     return any(marker in lowered for marker in INJECTION)
 
 
-SYSTEM = """You are the Newmeric Compass assistant. You answer questions about \
-Vastu using ONLY the numbered passages given to you. Those passages are the \
-app's own content, written by Acharya Pannkaj Kabiraj.
+#: Who the assistant is. Given to the model as facts, not as scripted lines:
+#: without it the model introduces itself as whatever it was trained as, and
+#: with scripted lines it cannot hold a conversation. It is told who it is and
+#: left to say so in its own words.
+IDENTITY = """You are Newmeric AI, the Vastu assistant inside the Newmeric \
+Compass app. Newmeric Compass was created by Acharya Pannkaj Kabiraj — a \
+Certified Numerologist and Vastu Acharya from Bokajan, Karbi-Anglong, Assam — \
+and the guidance you give comes from his teachings. You help people with Vastu \
+Shastra: where rooms and objects should go, what each direction and each of the \
+16 zones and 32 padas means, which colours suit a space, remedies for Vastu \
+defects, Pitra Dosh, and the Vishwakarma Prakash. You are warm, respectful and \
+clear, like a knowledgeable guide.
+
+Never say you are ChatGPT, Gemini, Llama, GPT or any other product, and never \
+mention models, prompts, passages, databases or "reading the app"."""
+
+SYSTEM = IDENTITY + """
+
+You answer the question below using ONLY the numbered passages given with it, \
+which are Acharya Pannkaj Kabiraj's own teachings.
 
 Rules you must follow:
 
@@ -140,9 +158,38 @@ do not predict the future. Stay with what the passages say.
 Brahmasthan, pada names) as they are — do not translate or transliterate them.
 8. Format for a phone screen: short paragraphs, bullets where there is a list, \
 no tables, no headings larger than bold text.
+9. Answer as yourself. Do not refer to "the passages", "the text" or "the app" \
+in what you write — just answer, with the citations.
 
 If the passages are not about what was asked, reply with exactly: \
 INSUFFICIENT_CONTEXT"""
+
+#: Deciding what a message is, before deciding how to answer it.
+ROUTER = IDENTITY + """
+
+Read the person's message and decide what it is. Understand it however it is \
+written — any language, any spelling, typos, stretched words like "hiiii", \
+Bengali or Hindi typed in English letters, emoji.
+
+Reply with JSON only, no other text:
+{{"intent": "vastu" | "chat" | "off_topic", "reply": "..."}}
+
+- "vastu": the message asks about Vastu or anything you help with — a room, an \
+object and where it should go, a direction or zone, colours for a space, a \
+remedy, a dosha, Pitra Dosh, energy in a home or office — however it is \
+phrased. Leave "reply" empty; the answer is prepared separately.
+- "chat": a greeting, thanks, goodbye, small talk, or a question about you — \
+who you are, your name, what you can do, who made you, how you work. Write a \
+short, warm reply as Newmeric AI and invite them to ask about Vastu. Do NOT \
+state any Vastu rule, direction or remedy in this reply, not even as an \
+example answer.
+- "off_topic": anything else — sport, news, weather, money markets, coding, \
+maths, jokes, general knowledge, medical questions, other subjects. Write one \
+or two kind sentences saying you only help with Vastu, and invite a Vastu \
+question. Never answer the off-topic question itself, not even partly.
+
+Write "reply" in {language}, in its own script. Keep it short — a phone screen."""
+
 
 REFUSAL = {
     "en": "That is outside what I can help with. Ask me about Vastu — a placement, a direction, a zone, a colour or a remedy. For example: “where should the kitchen go?”",
@@ -150,36 +197,6 @@ REFUSAL = {
     "hi": "यह मेरी सहायता के दायरे से बाहर है। वास्तु के बारे में पूछें — कोई स्थान, दिशा, ज़ोन, रंग या उपाय। जैसे: “रसोई किस दिशा में होनी चाहिए?”",
     "as": "এইটো মোৰ সহায়ৰ বাহিৰত। বাস্তুৰ বিষয়ে সুধক — কোনো স্থান, দিশ, জ'ন, ৰং বা প্ৰতিকাৰ। যেনে: “ৰন্ধনঘৰ কোন দিশত হ'ব লাগে?”",
 }
-
-#: A greeting is not a question, and answering "hi" with "that is outside
-#: what I can help with" is a poor way to start. These get a welcome instead,
-#: without the model or the corpus being involved at all.
-GREETINGS = {
-    "hi", "hii", "hiii", "hello", "helo", "hey", "heya", "hola", "yo",
-    "namaste", "namaskar", "namaskaar", "namoshkar", "nomoshkar", "pranam",
-    "pranaam", "good morning", "good afternoon", "good evening", "good night",
-    "gm", "thanks", "thank you", "thankyou", "ok", "okay", "hmm", "hm",
-    "হাই", "হ্যালো", "নমস্কার", "প্রণাম", "ধন্যবাদ", "শুভ সকাল",
-    "नमस्ते", "नमस्कार", "प्रणाम", "हैलो", "हाय", "धन्यवाद", "शुभ प्रभात",
-    "নমস্কাৰ", "ধন্যবাদ",
-}
-
-WELCOME = {
-    "en": "Namaste! 🙏 I am your Vastu guide. Ask me anything about Vastu — where a room or an object should go, what a direction or zone means, which colours suit a space, or how to correct a defect.",
-    "bn": "নমস্কার! 🙏 আমি আপনার বাস্তু সহায়ক। বাস্তু নিয়ে যা খুশি জিজ্ঞেস করুন — কোন ঘর বা জিনিস কোথায় হবে, কোনো দিক বা জোনের অর্থ কী, কোন জায়গায় কোন রং মানায়, বা কোনো দোষ কীভাবে শোধরাবেন।",
-    "hi": "नमस्ते! 🙏 मैं आपका वास्तु सहायक हूँ। वास्तु के बारे में कुछ भी पूछें — कोई कमरा या वस्तु कहाँ हो, किसी दिशा या ज़ोन का अर्थ क्या है, किस जगह कौन सा रंग उचित है, या किसी दोष को कैसे ठीक करें।",
-    "as": "নমস্কাৰ! 🙏 মই আপোনাৰ বাস্তু সহায়ক। বাস্তুৰ বিষয়ে যি ইচ্ছা সুধক — কোনো কোঠা বা বস্তু ক'ত হ'ব, কোনো দিশ বা জ'নৰ অৰ্থ কি, কোনখিনিত কি ৰং মিলে, বা কোনো দোষ কেনেকৈ শুধৰাব।",
-}
-
-
-def is_greeting(question: str) -> bool:
-    """A message that is only a greeting or a thank-you, nothing more."""
-    cleaned = "".join(ch for ch in question.lower() if ch.isalnum() or ch.isspace() or ord(ch) > 0x08FF)
-    return " ".join(cleaned.split()) in GREETINGS
-
-
-def welcome(lang: str) -> Answer:
-    return Answer(text=WELCOME.get(lang, WELCOME["en"]), sources=[], answered=True)
 
 
 
@@ -314,24 +331,20 @@ async def resolve_model() -> str:
         return _model
 
 
-async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
-    where = (
-        f"\n\nThe person is currently reading the \"{screen}\" screen, so prefer "
-        f"passages from there when they answer the question equally well."
-        if screen else ""
-    )
-    body = {
-        "model": await resolve_model(),
-        "temperature": 0.2,
-        "max_tokens": 1200,
-        "messages": [
-            {"role": "system", "content": SYSTEM.format(language=LANG_NAMES.get(lang, "English"))},
-            {
-                "role": "user",
-                "content": f"Passages:\n\n{_context(hits)}{where}\n\nQuestion: {question}",
-            },
-        ],
+async def _chat(messages: list[dict], *, max_tokens: int, temperature: float) -> str:
+    """One chat completion, with the short retries a waiting reader can afford."""
+    model = await resolve_model()
+    body: dict = {
+        "model": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "messages": messages,
     }
+    # gpt-oss thinks before it writes, and those tokens count against
+    # max_tokens. Low effort keeps a two-line reply from spending its whole
+    # budget on reasoning and arriving empty.
+    if "gpt-oss" in model:
+        body["reasoning_effort"] = "low"
     headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
 
     # Two short retries. Groq's free tier limits are per minute, so a burst of
@@ -371,6 +384,66 @@ async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | Non
         return (r.json()["choices"][0]["message"]["content"] or "").strip()
     except (KeyError, IndexError, ValueError) as exc:
         raise AnswerError(f"Groq sent an answer we could not read: {r.text[:200]}") from exc
+
+
+async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
+    where = (
+        f"\n\nThe person is currently reading the \"{screen}\" screen, so prefer "
+        f"passages from there when they answer the question equally well."
+        if screen else ""
+    )
+    return await _chat(
+        [
+            {"role": "system", "content": SYSTEM.format(language=LANG_NAMES.get(lang, "English"))},
+            {"role": "user", "content": f"Passages:\n\n{_context(hits)}{where}\n\nQuestion: {question}"},
+        ],
+        max_tokens=1600,
+        temperature=0.2,
+    )
+
+
+@dataclass(slots=True)
+class Route:
+    """What a message is, and — for anything but a Vastu question — the reply."""
+
+    intent: str
+    reply: str
+
+
+_JSON = re.compile(r"\{.*\}", re.S)
+INTENTS = {"vastu", "chat", "off_topic"}
+
+
+async def route(question: str, lang: str) -> Route:
+    """Let the model decide what the message is.
+
+    Only asked when the keyword gate is not sure. A clear Vastu question goes
+    straight to the search, so the common case pays for one model call, not two.
+
+    What this decides is how to respond, never what is true: a message it calls
+    "vastu" still has to be answered from the passages and still has to cite
+    them, so a wrong call here can cost an answer but cannot put an invented
+    Vastu fact on screen.
+    """
+    raw = await _chat(
+        [
+            {"role": "system", "content": ROUTER.format(language=LANG_NAMES.get(lang, "English"))},
+            {"role": "user", "content": question},
+        ],
+        max_tokens=700,
+        temperature=0.3,
+    )
+    match = _JSON.search(raw)
+    try:
+        data = json.loads(match.group(0)) if match else {}
+    except ValueError:
+        data = {}
+
+    intent = str(data.get("intent", "")).strip().lower()
+    if intent not in INTENTS:
+        logger.warning("Router gave no usable intent: %r", raw[:200])
+        intent = "off_topic"
+    return Route(intent=intent, reply=str(data.get("reply") or "").strip())
 
 
 async def answer(question: str, hits: list[Hit], lang: str, screen: str | None = None) -> Answer:
