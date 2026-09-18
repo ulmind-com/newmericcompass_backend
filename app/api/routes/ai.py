@@ -34,11 +34,21 @@ USAGE = "ai_usage"
 LANGS = {"en", "bn", "hi", "as"}
 
 
+class HistoryTurn(BaseModel):
+    """One earlier exchange in the same chat."""
+
+    question: str = Field(max_length=500)
+    answer: str = Field(max_length=4000)
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     lang: str = "en"
     #: The screen the reader is on, when they asked from inside one.
     screen: Optional[str] = None
+    #: The conversation so far, oldest first. The server keeps none of it —
+    #: the chat lives on the reader's phone and comes with each question.
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=20)
 
 
 class SourceOut(BaseModel):
@@ -124,6 +134,7 @@ async def ask(
 
     lang = payload.lang if payload.lang in LANGS else "en"
     question = payload.question.strip()
+    history = [answering.Turn(t.question, t.answer) for t in payload.history][-answering.HISTORY_TURNS:]
     remaining = await _spend(db, _caller(authorization, x_device_id, request))
 
     unavailable = HTTPException(
@@ -136,49 +147,67 @@ async def ask(
     if answering.looks_like_injection(question):
         return _reply(answering.refusal(lang), remaining)
 
+    async def decide(query: str) -> answering.Route:
+        try:
+            return await answering.route(query, lang, history)
+        except answering.AnswerError as exc:
+            logger.error("Routing failed: %s", exc)
+            raise unavailable from exc
+
+    # What gets searched for. Usually the question as asked; mid-conversation,
+    # the question restated so it stands on its own.
+    search = question
+    decided: answering.Route | None = None
+
+    if history:
+        # In a conversation the message has to be read against what came
+        # before, whatever it looks like: "what about the bedroom?" is a Vastu
+        # question only because of the one before it. So the model always
+        # reads it — and restates it, so the search has something to find.
+        decided = await decide(question)
+        if decided.intent == "vastu" and decided.question:
+            search = decided.question
+
     # A question the embedding service cannot handle is still answerable from
     # the keyword half, so a Gemini outage degrades the assistant rather than
     # taking it down.
     vector: list[float] | None = None
     if embeddings.is_configured():
         try:
-            vector = await embeddings.embed_query(question)
+            vector = await embeddings.embed_query(search)
         except embeddings.EmbeddingError as exc:
             logger.warning("Falling back to keyword-only retrieval: %s", exc)
 
     # Two ways in. A message the keyword gate is sure about is a Vastu question
     # and goes straight to the search — the common case, one model call. Anything
-    # the gate is unsure of — "hiiii", "tumi ke", "what's your name", a Vastu
-    # question phrased in a way the gate does not recognise — goes to the model
-    # to decide what it is. Nothing about greetings or small talk is listed
-    # here: the model reads the message the way a person would.
-    rel = index.relevance(question, vector)
+    # the gate is unsure of goes to the model to decide what it is. Nothing about
+    # greetings or small talk is listed here: the model reads the message the
+    # way a person would.
+    rel = index.relevance(search, vector)
     confident = answering.should_answer(rel)
 
-    if not confident:
-        try:
-            decision = await answering.route(question, lang)
-        except answering.AnswerError as exc:
-            logger.error("Routing failed: %s", exc)
-            raise unavailable from exc
+    if decided is None and not confident:
+        decided = await decide(question)
 
+    if decided is not None:
         logger.info(
-            "Routed %r as %s (coverage=%.2f heading_terms=%d)",
-            question[:80], decision.intent, rel.coverage, rel.heading_terms,
+            "Routed %r as %s%s (coverage=%.2f heading_terms=%d)",
+            question[:80], decided.intent,
+            f" -> {search[:80]!r}" if search != question else "",
+            rel.coverage, rel.heading_terms,
         )
-        if decision.intent == "chat":
-            return _reply(answering.Answer(decision.reply, [], True), remaining)
-        if decision.intent == "off_topic":
-            text = decision.reply or answering.refusal(lang).text
+        if decided.intent == "chat":
+            return _reply(answering.Answer(decided.reply, [], True), remaining)
+        if decided.intent == "off_topic":
+            text = decided.reply or answering.refusal(lang).text
             return _reply(answering.Answer(text, [], False), remaining)
-        # "vastu": a real question the gate did not recognise. It is answered
-        # exactly like any other — from the passages, with citations checked —
-        # so the model's call here decides that an answer is attempted, never
-        # what the answer says.
+        # "vastu": answered exactly like any other question — from the
+        # passages, with citations checked — so the model's call here decides
+        # that an answer is attempted, never what the answer says.
 
-    hits = index.search(question, vector, k=8)
+    hits = index.search(search, vector, k=8)
     try:
-        result = await answering.answer(question, hits, lang, payload.screen)
+        result = await answering.answer(search, hits, lang, payload.screen)
     except answering.AnswerError as exc:
         # The reason belongs in the log, not in a reader's face.
         logger.error("Answering failed: %s", exc)
@@ -189,15 +218,15 @@ async def ask(
     # it to the search, the search had nothing to say, and the reader was told
     # their question was out of scope. When a search the gate was sure of comes
     # back empty-handed, the model reads the message before anyone is refused.
-    if confident and not result.answered:
+    if decided is None and confident and not result.answered:
         try:
-            decision = await answering.route(question, lang)
+            second = await answering.route(question, lang, history)
         except answering.AnswerError:
             return _reply(result, remaining)
-        if decision.intent == "chat":
-            return _reply(answering.Answer(decision.reply, [], True), remaining)
-        if decision.intent == "off_topic" and decision.reply:
-            return _reply(answering.Answer(decision.reply, [], False), remaining)
+        if second.intent == "chat":
+            return _reply(answering.Answer(second.reply, [], True), remaining)
+        if second.intent == "off_topic" and second.reply:
+            return _reply(answering.Answer(second.reply, [], False), remaining)
 
     return _reply(result, remaining)
 

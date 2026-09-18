@@ -194,6 +194,23 @@ question. Never answer the off-topic question itself, not even partly.
 
 Write "reply" in {language}, in its own script. Keep it short — a phone screen."""
 
+#: Added to the router when there is a conversation to read.
+ROUTER_WITH_HISTORY = """
+
+The conversation so far comes before the latest message. Use it to understand \
+what the latest message refers to: "what is the remedy for it?", "and the \
+bedroom?", "why?", "explain more" all depend on what was said before.
+
+Add a third field to the JSON:
+{{"intent": ..., "reply": ..., "question": "..."}}
+
+For intent "vastu", "question" is the latest message rewritten as one \
+complete question in English that makes sense on its own, with everything it \
+refers to spelled out. "what is the remedy for it?" after a message about a \
+toilet in the north-east becomes "What is the remedy for a toilet in the \
+North-East?". If the latest message already stands on its own, translate it \
+to English as it is. For "chat" and "off_topic", leave "question" empty."""
+
 
 REFUSAL = {
     "en": "That is outside what I can help with. Ask me about Vastu — a placement, a direction, a zone, a colour or a remedy. For example: “where should the kitchen go?”",
@@ -412,13 +429,45 @@ class Route:
 
     intent: str
     reply: str
+    #: For a Vastu question asked mid-conversation: the question restated so it
+    #: stands on its own. Empty when there was no conversation to restate from.
+    question: str = ""
+
+
+@dataclass(slots=True)
+class Turn:
+    """One exchange from earlier in the conversation, as the app sends it."""
+
+    question: str
+    answer: str
+
+
+#: How much conversation the router is shown. Enough to follow a thread; not
+#: so much that an old topic outweighs the one being asked about now.
+HISTORY_TURNS = 6
+HISTORY_ANSWER_CHARS = 700
+_CITES = re.compile(r"\[\d+\]")
+
+
+def _history_messages(history: list[Turn]) -> list[dict]:
+    """The conversation, as chat messages, trimmed to what helps.
+
+    Citation numbers are stripped from earlier answers: they point at passages
+    from an earlier search, which this model is not shown, so they are noise.
+    """
+    out: list[dict] = []
+    for turn in history[-HISTORY_TURNS:]:
+        out.append({"role": "user", "content": turn.question[:500]})
+        answer = _CITES.sub("", turn.answer)[:HISTORY_ANSWER_CHARS]
+        out.append({"role": "assistant", "content": answer})
+    return out
 
 
 _JSON = re.compile(r"\{.*\}", re.S)
 INTENTS = {"vastu", "chat", "off_topic"}
 
 
-async def route(question: str, lang: str) -> Route:
+async def route(question: str, lang: str, history: list[Turn] | None = None) -> Route:
     """Let the model decide what the message is.
 
     Only asked when the keyword gate is not sure. A clear Vastu question goes
@@ -429,12 +478,15 @@ async def route(question: str, lang: str) -> Route:
     them, so a wrong call here can cost an answer but cannot put an invented
     Vastu fact on screen.
     """
+    history = history or []
+    system = ROUTER + (ROUTER_WITH_HISTORY if history else "")
     raw = await _chat(
         [
-            {"role": "system", "content": ROUTER.format(language=LANG_NAMES.get(lang, "English"))},
+            {"role": "system", "content": system.format(language=LANG_NAMES.get(lang, "English"))},
+            *_history_messages(history),
             {"role": "user", "content": question},
         ],
-        max_tokens=700,
+        max_tokens=900,
         temperature=0.3,
     )
     match = _JSON.search(raw)
@@ -447,7 +499,11 @@ async def route(question: str, lang: str) -> Route:
     if intent not in INTENTS:
         logger.warning("Router gave no usable intent: %r", raw[:200])
         intent = "off_topic"
-    return Route(intent=intent, reply=str(data.get("reply") or "").strip())
+    return Route(
+        intent=intent,
+        reply=str(data.get("reply") or "").strip(),
+        question=str(data.get("question") or "").strip(),
+    )
 
 
 async def answer(question: str, hits: list[Hit], lang: str, screen: str | None = None) -> Answer:
