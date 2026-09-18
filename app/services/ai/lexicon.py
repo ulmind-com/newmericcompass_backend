@@ -48,6 +48,24 @@ DIRECTIONS: dict[str, str] = {
     "north north west": "nnw", "nnw": "nnw",
     "centre": "brahmasthan", "center": "brahmasthan", "middle": "brahmasthan",
     "brahmasthan": "brahmasthan", "brahmsthan": "brahmasthan",
+    # Romanised Bengali and Hindi, with the locative "-e" people add to them —
+    # "toilet uttor purbe ache" means "the toilet is in the north-east", and
+    # without these that question matched a toilet passage for the wrong zone.
+    "uttor": "n", "uttar": "n", "uttara": "n", "uttore": "n", "uttare": "n",
+    "dokkhin": "s", "dokhin": "s", "dakshin": "s", "dakkhin": "s",
+    "dokkhine": "s", "dakshine": "s",
+    "purbo": "e", "purba": "e", "purbe": "e", "purv": "e", "purab": "e",
+    "poorab": "e", "purb": "e", "purbo dik": "e",
+    "poschim": "w", "paschim": "w", "pashchim": "w", "poshchim": "w",
+    "poschime": "w", "paschime": "w",
+    "uttor purbo": "ne", "uttor purbe": "ne", "uttar purv": "ne", "uttar purab": "ne",
+    "uttar purva": "ne", "uttor purba": "ne", "ishan kon": "ne", "ishan kona": "ne",
+    "dokkhin purbo": "se", "dokkhin purbe": "se", "dakshin purv": "se",
+    "dakshin purab": "se", "agni kon": "se", "agni kona": "se",
+    "dokkhin poschim": "sw", "dokkhin poschime": "sw", "dakshin paschim": "sw",
+    "nairitya kon": "sw", "nairutya kon": "sw",
+    "uttor poschim": "nw", "uttor poschime": "nw", "uttar paschim": "nw",
+    "vayavya kon": "nw", "vayu kon": "nw",
 }
 
 # --- What things are called -------------------------------------------------

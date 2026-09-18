@@ -184,6 +184,21 @@ async def ask(
         logger.error("Answering failed: %s", exc)
         raise unavailable from exc
 
+    # The gate can be sure of something it has misread. "What is your name"
+    # contains one word that happens to appear in a heading, so the gate sent
+    # it to the search, the search had nothing to say, and the reader was told
+    # their question was out of scope. When a search the gate was sure of comes
+    # back empty-handed, the model reads the message before anyone is refused.
+    if confident and not result.answered:
+        try:
+            decision = await answering.route(question, lang)
+        except answering.AnswerError:
+            return _reply(result, remaining)
+        if decision.intent == "chat":
+            return _reply(answering.Answer(decision.reply, [], True), remaining)
+        if decision.intent == "off_topic" and decision.reply:
+            return _reply(answering.Answer(decision.reply, [], False), remaining)
+
     return _reply(result, remaining)
 
 
