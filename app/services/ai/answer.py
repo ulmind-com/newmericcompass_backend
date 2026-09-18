@@ -58,6 +58,20 @@ NOT_FOR_CHAT = (
 _model: str | None = None
 _model_lock = asyncio.Lock()
 
+#: The model that reads each message before it is answered. Kept separate from
+#: the answering model on purpose: Groq's free-tier limits are per model, so
+#: reading and answering on two models draw on two allowances instead of
+#: sharing one — which is what reading every message first would otherwise
+#: halve. The job is short (classify, restate) so a smaller model does it well,
+#: and faster. Falls back to the answering model when none of these is offered.
+ROUTER_MODELS = (
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+    "groq/compound-mini",
+    "llama-3.1-8b-instant",
+)
+_router_model: str | None = None
+
 
 class AnswerError(RuntimeError):
     """Groq could not be reached, or would not answer."""
@@ -373,9 +387,35 @@ async def resolve_model() -> str:
         return _model
 
 
-async def _chat(messages: list[dict], *, max_tokens: int, temperature: float) -> str:
+async def resolve_router_model() -> str:
+    """Which model reads messages: a smaller one with its own allowance."""
+    global _router_model
+    if _router_model:
+        return _router_model
+    answering = await resolve_model()
+    try:
+        available = set(await list_models())
+    except AnswerError:
+        return answering
+    for name in ROUTER_MODELS:
+        if name in available and name != answering:
+            _router_model = name
+            break
+    else:
+        _router_model = answering
+    logger.info("Reading messages with %s", _router_model)
+    return _router_model
+
+
+async def _chat(
+    messages: list[dict],
+    *,
+    max_tokens: int,
+    temperature: float,
+    model: str | None = None,
+) -> str:
     """One chat completion, with the short retries a waiting reader can afford."""
-    model = await resolve_model()
+    model = model or await resolve_model()
     body: dict = {
         "model": model,
         "temperature": temperature,
@@ -515,6 +555,7 @@ async def route(question: str, lang: str, history: list[Turn] | None = None) -> 
         ],
         max_tokens=900,
         temperature=0.3,
+        model=await resolve_router_model(),
     )
     match = _JSON.search(raw)
     try:

@@ -157,8 +157,16 @@ async def ask(
     try:
         decided = await answering.route(question, lang, history)
     except answering.AnswerError as exc:
-        logger.error("Routing failed: %s", exc)
-        raise unavailable from exc
+        # Reading the message is the first thing to hit a rate limit, since
+        # every message is read. Rather than turn the reader away, fall back to
+        # the keyword gate — the rules the assistant used before the model read
+        # everything. A clear Vastu question is still answered; anything the
+        # gate is unsure of gets the plain decline.
+        logger.warning("Routing unavailable, falling back to the keyword gate: %s", exc)
+        rel = index.relevance(question, None)
+        if not answering.should_answer(rel):
+            return _reply(answering.refusal(lang), remaining)
+        decided = answering.Route(intent="vastu", reply="", question="")
 
     search = decided.question or question
     logger.info(
