@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 import re
 from dataclasses import dataclass
 
@@ -407,17 +408,90 @@ async def resolve_router_model() -> str:
     return _router_model
 
 
+#: Models whose daily allowance is used up, and when to try them again.
+#:
+#: Groq's free tier caps each model's tokens per day — 200,000 for gpt-oss-120b,
+#: which is fifty-odd answers — and the cap is per model, not per account. So
+#: when one model's day is spent the next is tried, rather than every reader
+#: being told the assistant is unavailable until midnight UTC.
+_spent_until: dict[str, float] = {}
+
+_TRY_AGAIN = re.compile(r"try again in\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?", re.I)
+_THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
+
+
+def _daily_limit(body: str) -> bool:
+    """A 429 that will not clear in seconds: the model's day is spent."""
+    lowered = body.lower()
+    return "per day" in lowered or "(tpd)" in lowered or "(rpd)" in lowered
+
+
+def _wait_seconds(body: str) -> float:
+    m = _TRY_AGAIN.search(body)
+    if not m:
+        return 3600.0
+    h, mnt, sec = (float(x) if x else 0.0 for x in m.groups())
+    return max(60.0, h * 3600 + mnt * 60 + sec)
+
+
+async def _chain(first: str, preference: tuple[str, ...]) -> list[str]:
+    """The model to try first, then the others this account serves, best first."""
+    try:
+        available = set(await list_models())
+    except AnswerError:
+        available = set()
+    ordered = [first] + [m for m in (*preference, *PREFERRED_MODELS) if m in available]
+    now = time.monotonic()
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in ordered:
+        if m in seen:
+            continue
+        seen.add(m)
+        if _spent_until.get(m, 0) <= now:
+            out.append(m)
+    return out
+
+
 async def _chat(
     messages: list[dict],
     *,
     max_tokens: int,
     temperature: float,
     model: str | None = None,
+    preference: tuple[str, ...] = (),
 ) -> str:
-    """One chat completion, with the short retries a waiting reader can afford."""
-    model = model or await resolve_model()
+    """One chat completion.
+
+    Short retries for a per-minute limit, because somebody is waiting; a move
+    to the next model for a daily one, because waiting would mean hours.
+    """
+    first = model or await resolve_model()
+    candidates = await _chain(first, preference)
+    if not candidates:
+        raise AnswerError("Every available model has used its daily allowance.")
+
+    last = "no response"
+    for name in candidates:
+        try:
+            return await _chat_once(name, messages, max_tokens=max_tokens, temperature=temperature)
+        except _DailyLimit as exc:
+            _spent_until[name] = time.monotonic() + exc.wait
+            logger.warning("%s has used its daily allowance; trying the next model", name)
+            last = str(exc)
+            continue
+    raise AnswerError(f"Every available model is at its limit. Last: {last}")
+
+
+class _DailyLimit(AnswerError):
+    def __init__(self, message: str, wait: float):
+        super().__init__(message)
+        self.wait = wait
+
+
+async def _chat_once(name: str, messages: list[dict], *, max_tokens: int, temperature: float) -> str:
     body: dict = {
-        "model": model,
+        "model": name,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "messages": messages,
@@ -425,13 +499,10 @@ async def _chat(
     # gpt-oss thinks before it writes, and those tokens count against
     # max_tokens. Low effort keeps a two-line reply from spending its whole
     # budget on reasoning and arriving empty.
-    if "gpt-oss" in model:
+    if "gpt-oss" in name:
         body["reasoning_effort"] = "low"
     headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
 
-    # Two short retries. Groq's free tier limits are per minute, so a burst of
-    # questions hits them and a few seconds is usually enough — but somebody is
-    # waiting, so this stays seconds rather than the minute a build can afford.
     last = "no response"
     for wait in (2, 6, 0):
         try:
@@ -448,6 +519,8 @@ async def _chat(
             break
 
         last = f"Groq refused ({r.status_code}): {r.text[:300]}"
+        if r.status_code == 429 and _daily_limit(r.text):
+            raise _DailyLimit(last, _wait_seconds(r.text))
         if r.status_code not in (429, 500, 502, 503, 504) or not wait:
             break
         retry_after = r.headers.get("retry-after")
@@ -463,9 +536,11 @@ async def _chat(
         raise AnswerError(last)
 
     try:
-        return (r.json()["choices"][0]["message"]["content"] or "").strip()
+        content = r.json()["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, ValueError) as exc:
         raise AnswerError(f"Groq sent an answer we could not read: {r.text[:200]}") from exc
+    # Some models write their reasoning into the reply itself.
+    return _THINK.sub("", content).strip()
 
 
 async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
@@ -556,6 +631,7 @@ async def route(question: str, lang: str, history: list[Turn] | None = None) -> 
         max_tokens=900,
         temperature=0.3,
         model=await resolve_router_model(),
+        preference=ROUTER_MODELS,
     )
     match = _JSON.search(raw)
     try:
