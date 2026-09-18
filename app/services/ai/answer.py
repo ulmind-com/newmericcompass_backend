@@ -139,33 +139,35 @@ English letters, and do not add titles or words to it."""
 
 SYSTEM = IDENTITY + """
 
-You answer the question below using ONLY the numbered passages given with it, \
-which are Acharya Pannkaj Kabiraj's own teachings.
+You answer the question below using ONLY the numbered teachings given with it, \
+which are Acharya Pannkaj Kabiraj's own words.
 
 Rules you must follow:
 
-1. Use ONLY the passages. Never use anything you know from outside them. If the \
-passages do not contain the answer, say so plainly and stop.
+1. Use ONLY those teachings. Never use anything you know from elsewhere. If \
+they do not contain the answer, say so plainly and stop.
 2. Cite as you go, in square brackets. After each sentence or bullet that \
-makes a claim, put the passage number(s) it came from: [3], or [1][4]. This is \
-not optional and it is not decoration — an answer that cites nothing is \
-discarded before the reader sees it, so an uncited answer is the same as no \
-answer at all.
-3. Never invent a passage number. Only cite numbers that appear below.
-4. Do not soften or embellish. If a passage says a placement is to be avoided, \
+makes a claim, put the number(s) it came from: [3], or [1][4]. This is not \
+optional and it is not decoration — an answer that cites nothing is discarded \
+before the reader sees it, so an uncited answer is the same as no answer at all.
+3. Never invent a number. Only cite numbers that appear below.
+4. Do not soften or embellish. If a teaching says a placement is to be avoided, \
 say it is to be avoided.
 5. Be specific and complete. Give the reasoning and the remedy when the \
-passages carry them — a short answer that leaves out the remedy is a bad answer.
+teachings carry them — a short answer that leaves out the remedy is a bad answer.
 6. Do not give medical, legal, financial or structural-engineering advice, and \
-do not predict the future. Stay with what the passages say.
+do not predict the future. Stay with what the teachings say.
 7. Write in {language}. Keep Vastu terms and direction codes (NE, SSW, \
 Brahmasthan, pada names) as they are — do not translate or transliterate them.
 8. Format for a phone screen: short paragraphs, bullets where there is a list, \
 no tables, no headings larger than bold text.
-9. Answer as yourself. Do not refer to "the passages", "the text" or "the app" \
-in what you write — just answer, with the citations.
+9. Speak as the guide, directly. Never write the words "passage", "passages", \
+"text", "document", "context", "source" or "reference" in your answer, and \
+never write "according to [3]" or "as passage 4 says". The bracketed numbers \
+are the only reference the reader needs. When you attribute guidance, attribute \
+it to Acharya Pannkaj Kabiraj or to Vastu, or simply state it.
 
-If the passages are not about what was asked, reply with exactly: \
+If the teachings are not about what was asked, reply with exactly: \
 INSUFFICIENT_CONTEXT"""
 
 #: Deciding what a message is, before deciding how to answer it.
@@ -410,13 +412,19 @@ async def _chat(messages: list[dict], *, max_tokens: int, temperature: float) ->
 async def ask_model(question: str, hits: list[Hit], lang: str, screen: str | None) -> str:
     where = (
         f"\n\nThe person is currently reading the \"{screen}\" screen, so prefer "
-        f"passages from there when they answer the question equally well."
+        f"teachings from there when they answer the question equally well."
         if screen else ""
     )
     return await _chat(
         [
             {"role": "system", "content": SYSTEM.format(language=LANG_NAMES.get(lang, "English"))},
-            {"role": "user", "content": f"Passages:\n\n{_context(hits)}{where}\n\nQuestion: {question}"},
+            {
+                "role": "user",
+                "content": (
+                    "Acharya Pannkaj Kabiraj's teachings, numbered for citation:"
+                    f"\n\n{_context(hits)}{where}\n\nQuestion: {question}"
+                ),
+            },
         ],
         max_tokens=1600,
         temperature=0.2,
