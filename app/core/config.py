@@ -50,9 +50,11 @@ class Settings(BaseSettings):
     # Left unset, the answering model is discovered too — Groq retires names
     # the same way, and the last hardcoded one turned every question into a 500.
     GROQ_MODEL: Optional[str] = None
-    # Questions one person may ask in a day. The assistant is free, so this is
-    # what stands between it and a bill.
-    AI_DAILY_LIMIT: int = 20
+    # Questions one person may ask in a day. 0 means no limit, which is the
+    # default: the owner wants the assistant open. It is kept as a setting so a
+    # limit can be put back from the Render dashboard, without a code change,
+    # if one person's use ever starts crowding everyone else out.
+    AI_DAILY_LIMIT: int = 0
 
     # Environment variables are loaded from the .env file in development
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

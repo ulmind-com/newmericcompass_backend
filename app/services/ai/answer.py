@@ -145,11 +145,42 @@ If the passages are not about what was asked, reply with exactly: \
 INSUFFICIENT_CONTEXT"""
 
 REFUSAL = {
-    "en": "I can only answer from what is written in this app, and I could not find anything here about that. Try asking about a placement, a direction, a zone, a colour or a remedy — for example, “where should the kitchen go?”",
-    "bn": "আমি শুধু এই অ্যাপে যা লেখা আছে তার থেকেই উত্তর দিতে পারি, আর এই বিষয়ে এখানে কিছু পেলাম না। কোনো স্থান, দিক, জোন, রং বা প্রতিকার নিয়ে জিজ্ঞেস করে দেখুন — যেমন, “রান্নাঘর কোন দিকে হওয়া উচিত?”",
-    "hi": "मैं केवल इस ऐप में लिखी बातों से ही उत्तर दे सकता हूँ, और इस विषय पर मुझे यहाँ कुछ नहीं मिला। किसी स्थान, दिशा, ज़ोन, रंग या उपाय के बारे में पूछकर देखें — जैसे, “रसोई किस दिशा में होनी चाहिए?”",
-    "as": "মই কেৱল এই এপত লিখা কথাৰ পৰাহে উত্তৰ দিব পাৰোঁ, আৰু এই বিষয়ে ইয়াত একো পোৱা নগ'ল। কোনো স্থান, দিশ, জ'ন, ৰং বা প্ৰতিকাৰৰ বিষয়ে সুধি চাওক — যেনে, “ৰন্ধনঘৰ কোন দিশত হ'ব লাগে?”",
+    "en": "That is outside what I can help with. Ask me about Vastu — a placement, a direction, a zone, a colour or a remedy. For example: “where should the kitchen go?”",
+    "bn": "এটা আমার সাহায্যের বাইরে। বাস্তু নিয়ে জিজ্ঞেস করুন — কোনো স্থান, দিক, জোন, রং বা প্রতিকার। যেমন: “রান্নাঘর কোন দিকে হওয়া উচিত?”",
+    "hi": "यह मेरी सहायता के दायरे से बाहर है। वास्तु के बारे में पूछें — कोई स्थान, दिशा, ज़ोन, रंग या उपाय। जैसे: “रसोई किस दिशा में होनी चाहिए?”",
+    "as": "এইটো মোৰ সহায়ৰ বাহিৰত। বাস্তুৰ বিষয়ে সুধক — কোনো স্থান, দিশ, জ'ন, ৰং বা প্ৰতিকাৰ। যেনে: “ৰন্ধনঘৰ কোন দিশত হ'ব লাগে?”",
 }
+
+#: A greeting is not a question, and answering "hi" with "that is outside
+#: what I can help with" is a poor way to start. These get a welcome instead,
+#: without the model or the corpus being involved at all.
+GREETINGS = {
+    "hi", "hii", "hiii", "hello", "helo", "hey", "heya", "hola", "yo",
+    "namaste", "namaskar", "namaskaar", "namoshkar", "nomoshkar", "pranam",
+    "pranaam", "good morning", "good afternoon", "good evening", "good night",
+    "gm", "thanks", "thank you", "thankyou", "ok", "okay", "hmm", "hm",
+    "হাই", "হ্যালো", "নমস্কার", "প্রণাম", "ধন্যবাদ", "শুভ সকাল",
+    "नमस्ते", "नमस्कार", "प्रणाम", "हैलो", "हाय", "धन्यवाद", "शुभ प्रभात",
+    "নমস্কাৰ", "ধন্যবাদ",
+}
+
+WELCOME = {
+    "en": "Namaste! 🙏 I am your Vastu guide. Ask me anything about Vastu — where a room or an object should go, what a direction or zone means, which colours suit a space, or how to correct a defect.",
+    "bn": "নমস্কার! 🙏 আমি আপনার বাস্তু সহায়ক। বাস্তু নিয়ে যা খুশি জিজ্ঞেস করুন — কোন ঘর বা জিনিস কোথায় হবে, কোনো দিক বা জোনের অর্থ কী, কোন জায়গায় কোন রং মানায়, বা কোনো দোষ কীভাবে শোধরাবেন।",
+    "hi": "नमस्ते! 🙏 मैं आपका वास्तु सहायक हूँ। वास्तु के बारे में कुछ भी पूछें — कोई कमरा या वस्तु कहाँ हो, किसी दिशा या ज़ोन का अर्थ क्या है, किस जगह कौन सा रंग उचित है, या किसी दोष को कैसे ठीक करें।",
+    "as": "নমস্কাৰ! 🙏 মই আপোনাৰ বাস্তু সহায়ক। বাস্তুৰ বিষয়ে যি ইচ্ছা সুধক — কোনো কোঠা বা বস্তু ক'ত হ'ব, কোনো দিশ বা জ'নৰ অৰ্থ কি, কোনখিনিত কি ৰং মিলে, বা কোনো দোষ কেনেকৈ শুধৰাব।",
+}
+
+
+def is_greeting(question: str) -> bool:
+    """A message that is only a greeting or a thank-you, nothing more."""
+    cleaned = "".join(ch for ch in question.lower() if ch.isalnum() or ch.isspace() or ord(ch) > 0x08FF)
+    return " ".join(cleaned.split()) in GREETINGS
+
+
+def welcome(lang: str) -> Answer:
+    return Answer(text=WELCOME.get(lang, WELCOME["en"]), sources=[], answered=True)
+
 
 
 @dataclass(slots=True)

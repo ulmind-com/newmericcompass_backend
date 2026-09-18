@@ -35,7 +35,7 @@ LANGS = {"en", "bn", "hi", "as"}
 
 
 class AskRequest(BaseModel):
-    question: str = Field(min_length=3, max_length=500)
+    question: str = Field(min_length=1, max_length=500)
     lang: str = "en"
     #: The screen the reader is on, when they asked from inside one.
     screen: Optional[str] = None
@@ -54,8 +54,9 @@ class AskResponse(BaseModel):
     sources: list[SourceOut]
     #: False when the question fell outside what the app covers.
     answered: bool
-    #: What is left of today's allowance, after this question.
-    remaining: int
+    #: What is left of today's allowance, after this question. None when there
+    #: is no allowance to run out of.
+    remaining: Optional[int] = None
 
 
 def _caller(authorization: Optional[str], device_id: Optional[str], request: Request) -> str:
@@ -78,8 +79,14 @@ def _caller(authorization: Optional[str], device_id: Optional[str], request: Req
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
 
-async def _spend(db: AsyncIOMotorDatabase, caller: str) -> int:
-    """Take one from today's allowance, or refuse. Returns what is left."""
+async def _spend(db: AsyncIOMotorDatabase, caller: str) -> Optional[int]:
+    """Take one from today's allowance, or refuse. Returns what is left.
+
+    With no limit configured there is nothing to count, so nothing is written:
+    None goes back and the app shows no counter.
+    """
+    if settings.AI_DAILY_LIMIT <= 0:
+        return None
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     key = f"{caller}:{today}"
     doc = await db[USAGE].find_one_and_update(
@@ -116,9 +123,15 @@ async def ask(
         raise HTTPException(status_code=503, detail="The assistant is still being prepared.")
 
     lang = payload.lang if payload.lang in LANGS else "en"
-    remaining = await _spend(db, _caller(authorization, x_device_id, request))
-
     question = payload.question.strip()
+
+    # A greeting is answered with a welcome, not searched for and refused, and
+    # it does not count against any allowance.
+    if answering.is_greeting(question):
+        hello = answering.welcome(lang)
+        return AskResponse(answer=hello.text, sources=[], answered=True, remaining=None)
+
+    remaining = await _spend(db, _caller(authorization, x_device_id, request))
 
     # A question the embedding service cannot handle is still answerable from
     # the keyword half, so a Gemini outage degrades the assistant rather than
