@@ -18,7 +18,13 @@ ENTITLEMENTS = "entitlements"
 PAYMENTS = "payments"
 PAYMENT_ORDERS = "payment_orders"
 
-ALL_FEATURES = [Feature.SUBMISSIONS, Feature.ANALYSIS, Feature.NEXUS, Feature.VASTU_ANALYSIS]
+ALL_FEATURES = [
+    Feature.SUBMISSIONS,
+    Feature.ANALYSIS,
+    Feature.NEXUS,
+    Feature.VASTU_ANALYSIS,
+    Feature.AI_ASSISTANT,
+]
 
 
 def plan_features(plan: dict[str, Any]) -> list[str]:

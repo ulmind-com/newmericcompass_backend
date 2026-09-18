@@ -5,8 +5,9 @@ be applied, embeds the question, retrieves, checks the retrieval was good enough
 to be worth answering from, and hands the passages to the model. Every decision
 about what may be said lives in `services/ai/answer.py`.
 
-Signing in is not required — the assistant is open to everyone — so an
-unauthenticated caller is counted against their device instead.
+The assistant is a paid feature, part of what a plan unlocks: a reader must be
+signed in and hold the ai_assistant entitlement, which is checked here before
+anything else runs.
 """
 
 from __future__ import annotations
@@ -16,14 +17,15 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
-import jwt
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core.database import get_database
-from app.core.security import TokenData, get_current_admin
+from app.core.security import TokenData, get_current_admin, get_current_user
+from app.domain import billing as bl
+from app.schemas.billing import Feature
 from app.services.ai import answer as answering
 from app.services.ai import embeddings, retrieve, store
 
@@ -69,26 +71,6 @@ class AskResponse(BaseModel):
     remaining: Optional[int] = None
 
 
-def _caller(authorization: Optional[str], device_id: Optional[str], request: Request) -> str:
-    """Who to count this question against.
-
-    A signed-in reader is counted by email so the limit follows them between
-    devices. Everyone else is counted by the device id the app sends, and by IP
-    if even that is missing — weaker, but it still costs something to get past.
-    """
-    if authorization and authorization.lower().startswith("bearer "):
-        try:
-            secret = settings.SECRET_KEY or "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
-            payload = jwt.decode(authorization[7:], secret, algorithms=[settings.ALGORITHM])
-            if email := payload.get("sub"):
-                return f"user:{str(email).strip().lower()}"
-        except jwt.PyJWTError:
-            pass
-    if device_id:
-        return f"device:{device_id[:64]}"
-    return f"ip:{request.client.host if request.client else 'unknown'}"
-
-
 async def _spend(db: AsyncIOMotorDatabase, caller: str) -> Optional[int]:
     """Take one from today's allowance, or refuse. Returns what is left.
 
@@ -120,11 +102,31 @@ async def _spend(db: AsyncIOMotorDatabase, caller: str) -> Optional[int]:
 @router.post("/ask", response_model=AskResponse, summary="Ask a question about the app's content")
 async def ask(
     payload: AskRequest,
-    request: Request,
     db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
-    authorization: Annotated[Optional[str], Header()] = None,
-    x_device_id: Annotated[Optional[str], Header()] = None,
+    current: Annotated[TokenData, Depends(get_current_user)],
 ):
+    # The assistant is part of what a plan unlocks, so it is checked here, on
+    # the server, the same way submissions are — the app's paywall is a
+    # courtesy, this is the lock. Checked before any model is called, so a
+    # reader without access costs nothing.
+    email = bl.normalize_email(current.email)
+    access = bl.access_from(
+        await bl.get_entitlement(db, email, Feature.AI_ASSISTANT), Feature.AI_ASSISTANT
+    )
+    if not access.allowed:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "reason": access.reason,
+                "feature": Feature.AI_ASSISTANT.value,
+                "message": (
+                    "Your access to Ask Newmeric AI has ended."
+                    if access.reason == "expired"
+                    else "Ask Newmeric AI is part of the Complete Vastu Access package."
+                ),
+            },
+        )
+
     if not answering.is_configured():
         raise HTTPException(status_code=503, detail="The assistant is not configured yet.")
 
@@ -135,7 +137,7 @@ async def ask(
     lang = payload.lang if payload.lang in LANGS else "en"
     question = payload.question.strip()
     history = [answering.Turn(t.question, t.answer) for t in payload.history][-answering.HISTORY_TURNS:]
-    remaining = await _spend(db, _caller(authorization, x_device_id, request))
+    remaining = await _spend(db, f"user:{email}")
 
     unavailable = HTTPException(
         status_code=503,

@@ -25,6 +25,7 @@ class Feature(StrEnum):
     ANALYSIS = "analysis"
     NEXUS = "nexus"
     VASTU_ANALYSIS = "vastu_analysis"
+    AI_ASSISTANT = "ai_assistant"
 
 
 class PlanKind(StrEnum):
