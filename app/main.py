@@ -138,6 +138,8 @@ _LANDING_HTML = """<!doctype html>
       <li>16 Zone Analysis — zone-by-zone Vastu readings for a placement</li>
       <li>7D Nexus — the seven-dimension reading of a direction</li>
       <li>Integrated Vastu Space &amp; Environment Analysis</li>
+      <li>Ask Newmeric AI — an assistant that answers Vastu questions from the
+      Acharya’s teachings</li>
       <li>Placement submissions reviewed by the consultant</li>
     </ul>
     <div class="note">These are digital reading sections inside the app. Prices
