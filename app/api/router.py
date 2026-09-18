@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter
 
 from app.api.routes import (
@@ -54,4 +56,6 @@ api_router.include_router(admin_uploads.router, prefix="/admin/uploads", tags=["
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    # Which commit is actually serving. Render says what it deployed; this says
+    # what is running, and the two have been seen to disagree.
+    return {"status": "ok", "commit": (os.environ.get("RENDER_GIT_COMMIT") or "unknown")[:7]}
