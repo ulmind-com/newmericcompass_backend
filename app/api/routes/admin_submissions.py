@@ -68,3 +68,31 @@ async def update_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Submission not found")
     return serialize_doc(doc)
+
+
+@router.delete("/{submission_id}", status_code=204, summary="Delete one submission")
+async def delete_submission(
+    submission_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    _: TokenData = Depends(get_current_admin),
+):
+    if not ObjectId.is_valid(submission_id):
+        raise HTTPException(status_code=400, detail="Invalid submission id")
+    await db[COLL].delete_one({"_id": ObjectId(submission_id)})
+
+
+@router.delete("/", summary="Clear the submissions")
+async def clear_submissions(
+    confirm: bool = Query(False, description="Must be true — this cannot be undone"),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    _: TokenData = Depends(get_current_admin),
+):
+    """Wipe every submission — for clearing test scans before going live.
+
+    The photos themselves stay in Cloudinary; this removes the app's record of
+    them, which is what the list here reads.
+    """
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Pass confirm=true to clear submissions.")
+    res = await db[COLL].delete_many({})
+    return {"deleted": res.deleted_count}

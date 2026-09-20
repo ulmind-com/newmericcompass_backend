@@ -10,30 +10,48 @@ from app.schemas.admin import DashboardStats, PaginatedUsersResponse, UserOvervi
 
 router = APIRouter()
 
+def _live_entitlement_query() -> dict:
+    """An unlock that is actually in force right now."""
+    return {
+        "is_active": {"$ne": False},
+        "$or": [{"expires_at": None}, {"expires_at": {"$gt": now_utc()}}],
+    }
+
+
+async def _paying_emails(db, emails: List[str] | None = None) -> set:
+    """Who holds a live unlock — the only place that knows, whoever paid.
+
+    ``users.is_premium`` is written false at sign-up and never again, so it
+    said "Free" for everyone including the people who had paid. Entitlements
+    are the record, so they are what this reads.
+    """
+    query = _live_entitlement_query()
+    if emails is not None:
+        query = {**query, "user_email": {"$in": [e.lower() for e in emails]}}
+    rows = await db.entitlements.find(query, {"user_email": 1}).to_list(length=5000)
+    return {r.get("user_email", "").lower() for r in rows}
+
+
 @router.get("/stats", response_model=DashboardStats)
 async def get_dashboard_stats(current_admin: TokenData = Depends(get_current_active_admin)):
     """Fetch high-level dashboard analytics (Admin only)."""
     db = get_database()
-    
-    # Run aggregations concurrently for better performance
-    total_users_future = db.users.count_documents({})
-    total_scans_future = db.properties.count_documents({})
-    premium_users_future = db.users.count_documents({"is_premium": True})
-    
-    total_users, total_scans, premium_users = await asyncio.gather(
-        total_users_future,
-        total_scans_future,
-        premium_users_future
+
+    # Scans are submissions, and revenue is the payments that were verified —
+    # both were counted off collections that never filled ("properties") or
+    # made up from a guessed price.
+    total_users, total_scans, paying, earned = await asyncio.gather(
+        db.users.count_documents({}),
+        db.submissions.count_documents({}),
+        _paying_emails(db),
+        db.payments.aggregate([{"$group": {"_id": None, "amount": {"$sum": "$amount"}}}]).to_list(length=1),
     )
-    
-    # Mocking revenue for now, could be fetched from payments collection
-    revenue = premium_users * 19.99 
 
     return DashboardStats(
         total_users=total_users,
         total_scans=total_scans,
-        premium_users=premium_users,
-        revenue=revenue
+        premium_users=len(paying),
+        revenue=float(earned[0]["amount"]) if earned else 0.0,
     )
 
 @router.get("/users", response_model=PaginatedUsersResponse)
@@ -50,14 +68,17 @@ async def get_all_users(
     users_db = await cursor.to_list(length=page_size)
     total_count = await db.users.count_documents({})
     
+    paying = await _paying_emails(db, [u.get("email", "") for u in users_db])
+
     users = []
     for u in users_db:
+        email = u.get("email", "unknown@example.com")
         users.append(UserOverview(
             id=str(u.get("_id", "")),
-            email=u.get("email", "unknown@example.com"),
+            email=email,
             name=u.get("name", "Unknown User"),
             created_at=u.get("created_at", now_utc()),
-            is_premium=u.get("is_premium", False),
+            is_premium=email.lower() in paying,
             status=u.get("status", "active")
         ))
         

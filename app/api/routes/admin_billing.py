@@ -133,6 +133,22 @@ async def revoke_access(
     await db[bl.ENTITLEMENTS].update_one({"_id": _oid(entitlement_id)}, {"$set": {"is_active": False}})
 
 
+@router.delete("/entitlements", summary="Erase every unlock for one user")
+async def wipe_user_access(
+    email: str = Query(..., description="The user whose unlocks go"),
+    _: TokenData = Depends(get_current_active_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Delete the rows outright rather than revoking them.
+
+    Revoking leaves the row behind, and a later purchase extends it. Deleting
+    puts the user back to where a new customer starts, which is what clearing
+    test access is for. Their payment records are not touched.
+    """
+    res = await db[bl.ENTITLEMENTS].delete_many({"user_email": bl.normalize_email(email)})
+    return {"email": bl.normalize_email(email), "deleted": res.deleted_count}
+
+
 @router.post("/entitlements/{entitlement_id}/reset-quota", response_model=EntitlementResponse, summary="Reset used quota")
 async def reset_quota(
     entitlement_id: str,
@@ -163,6 +179,36 @@ async def list_payments(
         query["feature"] = feature
     cursor = db[bl.PAYMENTS].find(query).sort("created_at", -1)
     return serialize_docs(await cursor.to_list(length=limit))
+
+
+@router.delete("/payments/{payment_id}", status_code=204, summary="Delete one payment record")
+async def delete_payment(
+    payment_id: str,
+    _: TokenData = Depends(get_current_active_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Remove a record from the books. What the user unlocked stays unlocked."""
+    await db[bl.PAYMENTS].delete_one({"_id": _oid(payment_id)})
+
+
+@router.delete("/payments", summary="Clear the payment records")
+async def clear_payments(
+    confirm: bool = Query(False, description="Must be true — this cannot be undone"),
+    email: str | None = Query(None, description="Only this user's records"),
+    _: TokenData = Depends(get_current_active_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Wipe the revenue history — for clearing test payments before going live.
+
+    Razorpay keeps its own record of every real payment, so this only clears
+    what this app shows. Access is not touched: anyone who bought something
+    keeps it unless their unlocks are erased too.
+    """
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Pass confirm=true to clear payment records.")
+    query = {"user_email": bl.normalize_email(email)} if email else {}
+    res = await db[bl.PAYMENTS].delete_many(query)
+    return {"deleted": res.deleted_count}
 
 
 @router.get("/revenue", response_model=RevenueReport, summary="Where the money came from")
