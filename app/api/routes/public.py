@@ -1,6 +1,7 @@
 """Public (app-facing) read endpoints: bootstrap config, categories, padas."""
 
-from fastapi import APIRouter, Depends
+from bson import ObjectId
+from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.config import settings
@@ -44,6 +45,22 @@ async def list_padas(db: AsyncIOMotorDatabase = Depends(get_database)):
 async def list_tips(db: AsyncIOMotorDatabase = Depends(get_database)):
     cursor = db[TIPS].find({"is_active": True}).sort("order", 1)
     return serialize_docs(await cursor.to_list(length=500))
+
+
+@router.get("/tips/{tip_id}", response_model=TipResponse, summary="One daily tip")
+async def get_tip(tip_id: str, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """The tip a notification was about, fetched on its own.
+
+    A notification carries the tip's id, and the app opens that tip rather than
+    the whole list — so the tip has to be reachable even when it has since
+    scrolled out of, or been taken off, the list.
+    """
+    if not ObjectId.is_valid(tip_id):
+        raise HTTPException(status_code=404, detail="Tip not found")
+    doc = await db[TIPS].find_one({"_id": ObjectId(tip_id), "is_active": True})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tip not found")
+    return serialize_doc(doc)
 
 
 @router.get("/config", summary="App bootstrap: categories + padas in one call")
