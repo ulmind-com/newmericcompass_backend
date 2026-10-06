@@ -15,12 +15,14 @@ from app.schemas.user import (
     AuthResponse, UserLogin, UserProfile, UserRegister, UserUpdate, VerifyOTPRequest,
     ResendOTPRequest, ForgotPasswordRequest, ResetPasswordRequest,
     SignupStartRequest, SignupCompleteRequest,
+    PhoneStartRequest, PhoneVerifyRequest, PhoneSignupCompleteRequest, PhoneLoginRequest,
 )
 
 import random
 import jwt
 
 from app.services.email_service import send_otp_email
+from app.services import whatsapp_service
 
 # Same secret/algorithm the rest of the auth stack uses.
 _SIGNUP_SECRET = settings.SECRET_KEY or "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -227,6 +229,202 @@ async def resend_otp(payload: ResendOTPRequest, db: AsyncIOMotorDatabase = Depen
         
     await _generate_and_send_otp(db, email, user.get("name", ""))
     return {"message": "OTP resent successfully"}
+
+# --- Mobile signup and login, verified over WhatsApp -------------------------
+#
+# The account is still keyed on an email everywhere else in this API — tokens,
+# entitlements, payments and submissions all carry one — so a mobile-only
+# signup is given a settled identity address of its own rather than a second
+# kind of account the rest of the system would have to learn about. The app
+# shows the number; the address is internal and the user can add a real one
+# later from their profile.
+
+PHONE_DOMAIN = "wa.newmericcompass.in"
+#: A code cannot be asked for again before this many seconds have passed.
+PHONE_RESEND_SECONDS = 60
+#: Wrong guesses allowed before the code has to be sent again.
+PHONE_MAX_ATTEMPTS = 5
+
+
+def _identity_email(phone: str) -> str:
+    return f"{phone}@{PHONE_DOMAIN}"
+
+
+def is_identity_email(email: str | None) -> bool:
+    """True for the address a mobile signup was given rather than typed."""
+    return bool(email) and email.lower().endswith(f"@{PHONE_DOMAIN}")
+
+
+def _phone_token_for(phone: str) -> str:
+    """Short-lived proof that this number's code was just verified."""
+    return create_access_token(
+        data={"sub": phone, "scope": "signup_phone"},
+        expires_delta=timedelta(minutes=20),
+    )
+
+
+def _phone_from_signup_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, _SIGNUP_SECRET, algorithms=[settings.ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+    if payload.get("scope") != "signup_phone":
+        return None
+    return (payload.get("sub") or "").strip() or None
+
+
+def _clean_phone(raw: str) -> str:
+    phone = whatsapp_service.normalise_mobile(raw)
+    if not phone:
+        raise HTTPException(status_code=422, detail="Please enter a valid WhatsApp number.")
+    return phone
+
+
+async def _send_phone_otp(db: AsyncIOMotorDatabase, phone: str) -> int:
+    """Send a fresh code, or report how long is left before one may be sent.
+
+    The wait is kept on the server as well as in the app: the app's own timer
+    is a courtesy, and this is what actually stops a number being messaged
+    over and over.
+    """
+    if not whatsapp_service.is_configured():
+        raise HTTPException(status_code=503, detail="WhatsApp sign-in is not available right now.")
+
+    record = await db["otps"].find_one({"phone": phone})
+    if record:
+        sent_at = as_utc(record.get("sent_at"))
+        if sent_at:
+            waited = (now_utc() - sent_at).total_seconds()
+            if waited < PHONE_RESEND_SECONDS:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Please wait {int(PHONE_RESEND_SECONDS - waited)}s before asking for another code.",
+                )
+
+    otp = str(random.randint(100000, 999999))
+    try:
+        await whatsapp_service.send_otp_whatsapp(phone, otp)
+    except whatsapp_service.WhatsAppError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    await db["otps"].update_one(
+        {"phone": phone},
+        {"$set": {
+            "phone": phone,
+            "otp": otp,
+            "attempts": 0,
+            "sent_at": now_utc(),
+            "expires_at": now_utc() + timedelta(minutes=OTP_TTL_MINUTES),
+        }},
+        upsert=True,
+    )
+    return PHONE_RESEND_SECONDS
+
+
+async def _consume_phone_otp(db: AsyncIOMotorDatabase, phone: str, otp: str) -> None:
+    """Check a code, counting the wrong guesses so it cannot be brute-forced."""
+    record = await db["otps"].find_one({"phone": phone})
+    if not record:
+        raise HTTPException(status_code=400, detail="Ask for a code first.")
+
+    expires_at = as_utc(record.get("expires_at"))
+    if expires_at and expires_at < now_utc():
+        raise HTTPException(status_code=400, detail="That code has expired. Send a new one.")
+
+    if int(record.get("attempts") or 0) >= PHONE_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many wrong codes. Send a new one.")
+
+    if str(record.get("otp")) != otp.strip():
+        await db["otps"].update_one({"phone": phone}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="That code is not right.")
+
+
+@router.post("/phone/start", response_model=dict, status_code=201)
+async def phone_start(payload: PhoneStartRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Step 1 — send a code to this WhatsApp number."""
+    phone = _clean_phone(payload.phone)
+
+    existing = await db[USERS].find_one({"phone": phone, "status": "active"})
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="This number already has an account. Please log in with it instead.",
+        )
+
+    retry_after = await _send_phone_otp(db, phone)
+    return {"message": "A code has been sent to your WhatsApp.", "phone": phone, "retry_after": retry_after}
+
+
+@router.post("/phone/resend", response_model=dict)
+async def phone_resend(payload: PhoneStartRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    phone = _clean_phone(payload.phone)
+    retry_after = await _send_phone_otp(db, phone)
+    return {"message": "A new code is on its way.", "retry_after": retry_after}
+
+
+@router.post("/phone/verify", response_model=dict)
+async def phone_verify(payload: PhoneVerifyRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Step 2 — check the code and hand back a short-lived signup token."""
+    phone = _clean_phone(payload.phone)
+    await _consume_phone_otp(db, phone, payload.otp)
+    await db["otps"].delete_one({"phone": phone})
+    return {"verified": True, "signup_token": _phone_token_for(phone)}
+
+
+@router.post("/phone/complete", response_model=AuthResponse)
+async def phone_complete(payload: PhoneSignupCompleteRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Step 3 — name and password on a verified number, and they are in."""
+    phone = _clean_phone(payload.phone)
+    if _phone_from_signup_token(payload.signup_token) != phone:
+        raise HTTPException(status_code=401, detail="Verification expired. Please verify your number again.")
+    if not payload.name.strip():
+        raise HTTPException(status_code=422, detail="Please enter your name.")
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=422, detail="Password must be at least 6 characters.")
+
+    if await db[USERS].find_one({"phone": phone, "status": "active"}):
+        raise HTTPException(status_code=409, detail="This number already has an account.")
+
+    email = (payload.email or "").lower().strip()
+    if email:
+        if "@" not in email:
+            raise HTTPException(status_code=422, detail="Please enter a valid email.")
+        if await db[USERS].find_one({"email": email, "status": "active"}):
+            raise HTTPException(status_code=409, detail="An account with this email already exists")
+    else:
+        email = _identity_email(phone)
+
+    doc = {
+        "name": payload.name.strip(),
+        "email": email,
+        "whatsapp": phone,
+        "phone": phone,
+        "phone_verified": True,
+        "email_verified": bool(payload.email),
+        "hashed_password": get_password_hash(payload.password),
+        "is_premium": False,
+        "status": "active",
+        "role": "user",
+        "created_at": now_utc(),
+    }
+    await db[USERS].update_one({"email": email}, {"$set": doc}, upsert=True)
+    user = await db[USERS].find_one({"email": email})
+    return AuthResponse(access_token=_token_for(email), user=_profile(user))
+
+
+@router.post("/login/phone", response_model=AuthResponse)
+async def login_with_phone(payload: PhoneLoginRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Log in with the WhatsApp number and the password set with it."""
+    phone = _clean_phone(payload.phone)
+    user = await db[USERS].find_one({"phone": phone})
+    if not user or not verify_password(payload.password, user.get("hashed_password", "")):
+        raise HTTPException(status_code=401, detail="Incorrect number or password")
+    if user.get("status") == "blocked":
+        raise HTTPException(status_code=403, detail="Account disabled")
+    if user.get("status") != "active":
+        raise HTTPException(status_code=403, detail="Please finish signing up with this number first.")
+    return AuthResponse(access_token=_token_for(user["email"]), user=_profile(user))
+
 
 @router.post("/forgot-password", response_model=dict)
 async def forgot_password(payload: ForgotPasswordRequest, db: AsyncIOMotorDatabase = Depends(get_database)):

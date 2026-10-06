@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     ACHARYA_PHONE: Optional[str] = None
     ACHARYA_WHATSAPP: Optional[str] = None
 
+    # WhatsApp one-time codes, through the apitxt.com gateway the owner bought.
+    # Without the key and project the phone signup reports itself unavailable
+    # and the email route carries on as before.
+    APITXT_AUTHKEY: Optional[str] = None
+    APITXT_PROJECT_REF_ID: Optional[str] = None
+    APITXT_TEMPLATE: str = "otp_verification"
+    APITXT_URL: str = "https://apitxt.com/api/sendWA"
+
     # Razorpay. Both come from the environment; the secret is never committed.
     RAZORPAY_KEY_ID: Optional[str] = None
     RAZORPAY_KEY_SECRET: Optional[str] = None

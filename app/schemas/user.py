@@ -58,6 +58,32 @@ class SignupCompleteRequest(BaseModel):
 class ResendOTPRequest(BaseModel):
     email: str
 
+
+# --- WhatsApp (mobile) signup and login -------------------------------------
+
+class PhoneStartRequest(BaseModel):
+    """Step 1 of the mobile signup: the number a code should go to."""
+    phone: str
+
+
+class PhoneVerifyRequest(BaseModel):
+    phone: str
+    otp: str
+
+
+class PhoneSignupCompleteRequest(BaseModel):
+    """Final step: the token from a verified code, plus the new profile."""
+    phone: str
+    name: str
+    password: str
+    email: Optional[str] = None
+    signup_token: str
+
+
+class PhoneLoginRequest(BaseModel):
+    phone: str
+    password: str
+
 class ForgotPasswordRequest(BaseModel):
     email: str
 
