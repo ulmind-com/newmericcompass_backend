@@ -18,7 +18,7 @@ from app.schemas.user import (
     PhoneStartRequest, PhoneVerifyRequest, PhoneSignupCompleteRequest, PhoneLoginRequest,
 )
 
-import random
+import secrets
 import jwt
 
 from app.services.email_service import send_otp_email
@@ -56,9 +56,20 @@ def _token_for(email: str) -> str:
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
+def _new_otp() -> str:
+    """A six-digit code worth trusting.
+
+    `secrets` rather than `random`: the latter is a Mersenne Twister seeded
+    once per process, so enough observed codes predict the next one — which is
+    exactly what an account-verification code must not allow. Leading zeros are
+    kept, so every code is six digits.
+    """
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
 async def _generate_and_send_otp(db: AsyncIOMotorDatabase, email: str, name: str, purpose: str = "verify"):
     """Store a fresh OTP and mail it out. `purpose` picks the template copy."""
-    otp = str(random.randint(100000, 999999))
+    otp = _new_otp()
     expires_at = now_utc() + timedelta(minutes=OTP_TTL_MINUTES)
     
     await db["otps"].update_one(
@@ -301,7 +312,7 @@ async def _send_phone_otp(db: AsyncIOMotorDatabase, phone: str) -> int:
                     detail=f"Please wait {int(PHONE_RESEND_SECONDS - waited)}s before asking for another code.",
                 )
 
-    otp = str(random.randint(100000, 999999))
+    otp = _new_otp()
     try:
         await whatsapp_service.send_otp_whatsapp(phone, otp)
     except whatsapp_service.WhatsAppError as exc:
