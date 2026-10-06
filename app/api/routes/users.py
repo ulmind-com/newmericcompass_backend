@@ -16,6 +16,7 @@ from app.schemas.user import (
     ResendOTPRequest, ForgotPasswordRequest, ResetPasswordRequest,
     SignupStartRequest, SignupCompleteRequest,
     PhoneStartRequest, PhoneVerifyRequest, PhoneSignupCompleteRequest, PhoneLoginRequest,
+    ContactStartRequest, ContactVerifyRequest,
 )
 
 import secrets
@@ -93,8 +94,11 @@ async def _consume_otp(db: AsyncIOMotorDatabase, email: str, otp: str) -> None:
 
 def _profile(doc: dict) -> UserProfile:
     doc = serialize_doc(dict(doc))
-    return UserProfile(**{k: doc.get(k) for k in
-                          ("id", "name", "email", "whatsapp", "phone", "is_premium", "status", "created_at")})
+    out = {k: doc.get(k) for k in
+           ("id", "name", "email", "whatsapp", "phone", "contact_email", "is_premium", "status", "created_at")}
+    out["phone_verified"] = bool(doc.get("phone_verified"))
+    out["email_verified"] = bool(doc.get("email_verified"))
+    return UserProfile(**out)
 
 
 @router.post("/register", response_model=dict, status_code=201)
@@ -190,6 +194,7 @@ async def signup_complete(payload: SignupCompleteRequest, db: AsyncIOMotorDataba
             "name": payload.name.strip(),
             "whatsapp": (payload.whatsapp or "").strip() or None,
             "hashed_password": get_password_hash(payload.password),
+            "email_verified": True,
             "status": "active",
         }},
         return_document=True,
@@ -200,14 +205,17 @@ async def signup_complete(payload: SignupCompleteRequest, db: AsyncIOMotorDataba
 @router.post("/login", response_model=AuthResponse)
 async def login(payload: UserLogin, db: AsyncIOMotorDatabase = Depends(get_database)):
     email = payload.email.lower().strip()
-    user = await db[USERS].find_one({"email": email})
+    # Either the address the account is keyed on, or one verified and added to
+    # it later — somebody who signed up with a number and then added their
+    # email expects that email to let them in.
+    user = await db[USERS].find_one({"$or": [{"email": email}, {"contact_email": email}]})
     if not user or not verify_password(payload.password, user.get("hashed_password", "")):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if user.get("status") == "unverified":
         raise HTTPException(status_code=403, detail="unverified_email")
     if user.get("status") == "blocked":
         raise HTTPException(status_code=403, detail="Account disabled")
-    return AuthResponse(access_token=_token_for(email), user=_profile(user))
+    return AuthResponse(access_token=_token_for(user["email"]), user=_profile(user))
 
 @router.post("/verify-otp", response_model=AuthResponse)
 async def verify_otp(payload: VerifyOTPRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
@@ -400,6 +408,10 @@ async def phone_complete(payload: PhoneSignupCompleteRequest, db: AsyncIOMotorDa
     if email:
         if "@" not in email:
             raise HTTPException(status_code=422, detail="Please enter a valid email.")
+        # Typing an address proves nothing, so the code sent to it has to have
+        # been answered — the same check the email-first signup makes.
+        if _email_from_signup_token(payload.email_token or "") != email:
+            raise HTTPException(status_code=401, detail="Please verify your email first.")
         if await db[USERS].find_one({"email": email, "status": "active"}):
             raise HTTPException(status_code=409, detail="An account with this email already exists")
     else:
@@ -411,7 +423,7 @@ async def phone_complete(payload: PhoneSignupCompleteRequest, db: AsyncIOMotorDa
         "whatsapp": phone,
         "phone": phone,
         "phone_verified": True,
-        "email_verified": bool(payload.email),
+        "email_verified": bool(email and not is_identity_email(email)),
         "hashed_password": get_password_hash(payload.password),
         "is_premium": False,
         "status": "active",
@@ -497,6 +509,95 @@ async def update_me(
         raise HTTPException(status_code=400, detail="No fields to update")
     user = await db[USERS].find_one_and_update(
         {"email": current.email}, {"$set": update}, return_document=True
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _profile(user)
+
+
+# --- Adding or changing your own email or number, each with a code ----------
+#
+# Both are ways back into the account, so neither moves on someone's say-so:
+# the code goes to the address or the number being claimed, and only an
+# answered code writes it. PATCH /me therefore takes the name and nothing else.
+
+@router.post("/me/email/start", response_model=dict)
+async def me_email_start(
+    payload: ContactStartRequest,
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    email = payload.value.lower().strip()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=422, detail="Please enter a valid email.")
+
+    taken = await db[USERS].find_one({
+        "$or": [{"email": email}, {"contact_email": email}],
+        "status": "active",
+    })
+    if taken and taken.get("email") != current.email:
+        raise HTTPException(status_code=409, detail="Another account already uses this email.")
+
+    user = await db[USERS].find_one({"email": current.email})
+    await _generate_and_send_otp(db, email, (user or {}).get("name", ""))
+    return {"message": "A code has been sent to that email."}
+
+
+@router.post("/me/email/verify", response_model=UserProfile)
+async def me_email_verify(
+    payload: ContactVerifyRequest,
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    email = payload.value.lower().strip()
+    await _consume_otp(db, email, payload.otp)
+    await db["otps"].delete_one({"email": email})
+
+    # The account keeps the address it is keyed on — entitlements, payments and
+    # submissions all carry it — and the verified one is recorded alongside,
+    # which is what the app shows and what logging in accepts.
+    user = await db[USERS].find_one_and_update(
+        {"email": current.email},
+        {"$set": {"contact_email": email, "email_verified": True}},
+        return_document=True,
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _profile(user)
+
+
+@router.post("/me/phone/start", response_model=dict)
+async def me_phone_start(
+    payload: ContactStartRequest,
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    phone = _clean_phone(payload.value)
+
+    taken = await db[USERS].find_one({"phone": phone, "status": "active"})
+    if taken and taken.get("email") != current.email:
+        raise HTTPException(status_code=409, detail="Another account already uses this number.")
+
+    retry_after = await _send_phone_otp(db, phone)
+    return {"message": "A code has been sent to that WhatsApp number.", "phone": phone, "retry_after": retry_after}
+
+
+@router.post("/me/phone/verify", response_model=UserProfile)
+async def me_phone_verify(
+    payload: ContactVerifyRequest,
+    current: TokenData = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    phone = _clean_phone(payload.value)
+    await _consume_phone_otp(db, phone, payload.otp)
+    await db["otps"].delete_one({"phone": phone})
+
+    # The verified number becomes both the login number and the one the owner
+    # is reached on, so there is one number to trust rather than two to compare.
+    user = await db[USERS].find_one_and_update(
+        {"email": current.email},
+        {"$set": {"phone": phone, "whatsapp": phone, "phone_verified": True}},
+        return_document=True,
     )
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

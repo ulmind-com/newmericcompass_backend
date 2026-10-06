@@ -22,6 +22,11 @@ class UserProfile(BaseModel):
     email: str
     whatsapp: Optional[str] = None
     phone: Optional[str] = None
+    #: An email added and verified after signing up with a number. The account
+    #: is still keyed on `email`; this is the address the person actually uses.
+    contact_email: Optional[str] = None
+    phone_verified: bool = False
+    email_verified: bool = False
     is_premium: bool = False
     status: str = "active"
     created_at: Optional[datetime] = None
@@ -29,9 +34,12 @@ class UserProfile(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    """What a user may change on their own.
+
+    Not the number and not the email: both are how someone gets back into the
+    account, so they only change through a code sent to them.
+    """
     name: Optional[str] = None
-    whatsapp: Optional[str] = None
-    phone: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
@@ -72,11 +80,16 @@ class PhoneVerifyRequest(BaseModel):
 
 
 class PhoneSignupCompleteRequest(BaseModel):
-    """Final step: the token from a verified code, plus the new profile."""
+    """Final step: the token from a verified code, plus the new profile.
+
+    An email may be added here, but only with its own verification token —
+    anyone can type an address they do not own.
+    """
     phone: str
     name: str
     password: str
     email: Optional[str] = None
+    email_token: Optional[str] = None
     signup_token: str
 
 
@@ -91,3 +104,13 @@ class ResetPasswordRequest(BaseModel):
     email: str
     otp: str
     new_password: str
+
+
+class ContactStartRequest(BaseModel):
+    """Add or change the signed-in user's own email or number: step 1."""
+    value: str
+
+
+class ContactVerifyRequest(BaseModel):
+    value: str
+    otp: str
